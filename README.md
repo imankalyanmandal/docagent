@@ -76,6 +76,18 @@ again to bring the other pane back.
 **Export .docx** downloads the edited base document **without navigating the
 page away** - you stay exactly where you are.
 
+**Export with tracked changes** downloads a copy where every difference from
+the document as uploaded is a real Word revision - deleted text struck
+through, inserted text underlined, heading-level changes recorded - so a
+reviewer can Accept / Reject each change in Word. It diffs content (not the
+edit history), word-by-word inside paragraphs and row/cell-by-row inside
+tables. Accept All gives exactly the current document; Reject All gives the
+original. The live document itself is never modified.
+
+**Images** - a paragraph that holds only a picture is its own **image block**
+with a preview. It can be checked, moved, duplicated, deleted, or used as a
+replace/insert source like any other block, and it moves with its section.
+
 **Paste HTML (Froala)** - each upload box has a **Paste HTML…** button. Paste
 HTML (as produced by Froala or anything else) and it's converted into editable
 blocks - headings, paragraphs, captions, lists, and tables. You then choose
@@ -150,7 +162,8 @@ undo slot or leaves a half-applied state.
 | POST | `/duplicate` | `{doc_id, block_ids[]}` (a heading clones its whole section) |
 | POST | `/find_replace` | `{doc_id, find, replace, case_sensitive?, scope?}` → `{..., replacements}` |
 | POST | `/undo` | `{doc_id}` |
-| GET | `/export/<doc_id>` | - |
+| GET | `/export/<doc_id>` | `?track=1&author=Name` for a tracked-changes copy |
+| GET | `/media/<doc_id>/<rid>` | image bytes, for image-block previews |
 
 `/table` operations: `add_row` `delete_row` `add_column` `delete_column`
 `sort` `transpose` `merge` `set_content`. `set_content` takes `{rows: [[...]]}`
@@ -169,15 +182,34 @@ column mapping) and then calls these same deterministic tools to execute
 it. Same for "combine these paragraphs sensibly" - judgement in the model,
 execution in tested code.
 
+### Formatting fidelity
+- **Replace keeps per-word emphasis.** A same-type replace copies the
+  source's runs: bold/italic/underline/strike/super-subscript/highlight and
+  character styles come from the source, while font, size and colour come
+  from the target - so the result fits the target document but keeps its
+  meaning-carrying emphasis. Table replaces do the same per cell.
+- **Spacing travels with its block.** Empty spacing paragraphs and page
+  breaks after a block belong to it: they move, duplicate and delete with
+  it, instead of piling up where a moved section used to be.
+- **Content copied from the Other document stays intact** (`fidelity.py`):
+  images are copied into the base document, hyperlinks keep their URL,
+  bulleted/numbered lists get their own numbering definition (items from one
+  list stay one list), and custom styles the base lacks are copied over.
+  When both documents define the same style, the base's definition wins, so
+  an inserted heading looks like the base's headings.
+- **Editing text next to an inline image keeps the image.**
+
 ## Known limitations
-- **Empty paragraphs are skipped** by the parser, so pure-spacing paragraphs
-  aren't selectable. They stay in the document and export fine.
-- **Replace loses per-word formatting from the source** - a same-type
-  paragraph replace reuses the target's first run, so a single bold word
-  mid-sentence in the source is dropped; the target's style wins.
-- **Images, headers/footers, footnotes and content controls aren't parsed**
-  into blocks. They survive export untouched but can't be selected or moved
-  - so moving a section that contains an image will leave the image behind.
+- **Empty paragraphs are not selectable** - they ride along with the block
+  before them (see above) and export fine.
+- **Charts, embedded objects, footnotes and comments** inside content copied
+  between documents aren't carried: charts/embedded files are refused with a
+  clear error, footnote and comment references are dropped.
+- **Headers/footers and body-level content controls (e.g. a table of
+  contents)** aren't parsed into blocks; they stay where they are and survive
+  export untouched.
+- **Tracked-changes export** shows a moved block as delete + insert, and
+  doesn't mark formatting-only changes to otherwise identical text.
 - **Moving a paragraph down past a heading** puts it at the end of that
   heading's section rather than immediately after the heading.
 - **State is in-memory** - restarting clears everything, docs evict past
@@ -222,9 +254,10 @@ See `TESTING.md`. In short:
 ```bash
 python make_fixtures.py    # regenerate backend response fixtures if the API changes
 python tests/test_backend_fixes.py   # find & replace, locking, upload-limit regressions
+python tests/test_fidelity.py        # formatting fidelity + tracked-changes export
 cd tests
 npm install                 # jsdom for the headless UI tests
-npm test                    # runs ui_test.mjs (27 checks) + perf_test.mjs (3 checks)
+npm test                    # runs ui_test.mjs (81 checks) + perf_test.mjs (3 checks)
 ```
 
 Test tooling lives in `tests/`, separate from `app.py`, so `npm install`

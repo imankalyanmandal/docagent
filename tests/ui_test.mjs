@@ -337,6 +337,33 @@ async function uploadInto(pane='base'){
   check('merge save writes combined rows via set_content', !!mergeSetContent && mergeSetContent.payload.block_id === tableIds[0]);
   check('merge save removes the OTHER table via /delete', !!mergeDeleteReq && mergeDeleteReq.payload.block_ids.includes(tableIds[1]));
 
+  console.log('\n=== Image blocks + tracked-changes export ===\n');
+  fakeFetch._nextUpload = fx.upload;
+  await uploadInto('base');
+  ev(`state.base.blocks = Object.assign({}, state.base.blocks,
+        {'9': {id:'9', type:'image', text:'', order:999, images:['rId42']}});
+      renderPane('base');`);
+  const imgWrap = document.querySelector('[data-block-id="9"]');
+  const img = imgWrap && imgWrap.querySelector('.image-block img');
+  check('image block renders an <img>', !!img);
+  check('image src points at /media/<doc>/<rid>',
+        !!img && img.getAttribute('src') === `/media/${ev('state.base.doc_id')}/rId42`);
+  check('image block edit (pencil) button is disabled',
+        imgWrap.querySelector('.move-controls button').disabled === true);
+  check('image block still has move buttons',
+        imgWrap.querySelectorAll('.move-controls button').length === 3);
+
+  ev('updateToolbar()');
+  check('tracked-changes export button enabled with a base doc', $('export-tracked-btn').disabled === false);
+  let clickedHref = null;
+  const origClick = window.HTMLAnchorElement.prototype.click;
+  window.HTMLAnchorElement.prototype.click = function(){ clickedHref = this.getAttribute('href'); };
+  ev('doExport(true)');
+  check('tracked export requests ?track=1', clickedHref === `/export/${ev('state.base.doc_id')}?track=1`);
+  ev('doExport()');
+  check('plain export has no track flag', clickedHref === `/export/${ev('state.base.doc_id')}`);
+  window.HTMLAnchorElement.prototype.click = origClick;
+
   if(notes.length){ console.log('\n  alerts:',notes); }
   console.log(`\n=== ${passed} passed, ${failed} failed ===`);
   process.exit(failed?1:0);

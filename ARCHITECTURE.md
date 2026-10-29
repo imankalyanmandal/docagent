@@ -114,32 +114,25 @@ place, and only then calls `resync()` to get a fresh, correct `blocks` view.
 Different operations touch the document differently, and each is
 deliberately shaped around *whose* formatting should win.
 
-### Same-type replace → mutate in place, target's formatting wins
+### Same-type replace → mutate in place, target's look + source's emphasis
 
 Replacing a paragraph with another paragraph, or a table with another
-table, reuses the *target's* existing XML element:
-
-```python
-def set_paragraph_text(paragraph, new_text):
-    runs = paragraph.runs
-    if runs:
-        runs[0].text = new_text        # reuse the first run's font/size/bold/color
-        for extra in runs[1:]:
-            extra._element.getparent().remove(extra._element)
-    else:
-        paragraph.add_run(new_text)
-```
-
-Reusing `runs[0]` instead of creating a new run means the new text inherits
-whatever font, size, bold, and color that run already had. The trade-off:
-if the *source* text had richer formatting than a single run (e.g. one bold
-word mid-sentence), that per-word detail doesn't survive — the target's
-style wins outright. This is a deliberate simplicity/fidelity trade-off for
-a prototype; see §7.
+table, reuses the *target's* existing XML element: its paragraph properties
+(style, spacing, numbering) are kept, and its first text run supplies the
+base look (font, size, colour). The source's runs are then copied in and
+restyled onto that base, keeping only the source's *emphasis* - see
+"Same-type replace keeps the source's emphasis" below. A bold word
+mid-sentence in the source is still bold in the result; a different font in
+the source is not imported.
 
 Tables work the same way — `set_table_content` resizes the existing table
-(see below) and then applies `set_paragraph_text` to each cell, so the
-table's style, borders, and shading are never touched, only its content.
+(see below) and fills cell text, then `fidelity.copy_table_content` upgrades
+each cell to the source cell's rich content, so the table's style, borders,
+and shading are never touched, only its content.
+
+Plain-text editing (`set_paragraph_text`, used by inline edit and the table
+editor) keeps the first text run's formatting and leaves non-text runs -
+inline images, fields - where they are.
 
 ### Resizing a table without losing its style
 
@@ -186,6 +179,26 @@ cross-type replace: deep-copy each selected source element and splice it
 into the base document. Inserted content keeps its *own* original
 formatting rather than being reflowed into the base document's style —
 which matches the mental model of "pasting a section from another doc."
+
+### Cross-document copies → re-point what the XML references
+
+A paragraph's XML is not self-contained: images and hyperlinks are referenced
+by relationship id, list bullets by numbering id, styles by style id - and
+those ids only mean something inside their own document. Every element that
+crosses from the Other document into the base (insert, cross-type replace,
+HTML append) goes through `fidelity.Importer`, which copies the image into
+the base package, re-creates the hyperlink relationship, gives an imported
+list its own numbering definition, and copies styles the base doesn't have.
+One Importer is shared per operation, so ten items from one source list map
+onto one new list and keep numbering 1, 2, 3...
+
+### Same-type replace keeps the source's emphasis
+
+`fidelity.copy_paragraph_content` copies the source's runs into the target
+paragraph and restyles each one as *target base run formatting + source
+emphasis* (bold, italic, underline, strike, vertical alignment, caps,
+highlight, character style). `rPr` children are re-sorted into the schema's
+required order, because Word rejects out-of-order run properties.
 
 ### Move → no formatting logic needed at all
 
@@ -348,17 +361,14 @@ operation inside `mutation()` → return `doc_state()`.
 These are conscious scope cuts, not oversights — worth knowing before
 extending the tool:
 
-- **Only headings, paragraphs, and tables become blocks.** Images, headers/
-  footers, footnotes, and content controls pass through export untouched
-  but aren't addressable — you can't select, move, or delete them via this
-  tool. Moving a section that contains an inline image will leave the image
-  behind.
-- **Empty paragraphs are skipped** by the parser (used for spacing) — they
-  survive export but aren't selectable blocks.
-- **Same-type replace only preserves the target's *first run's* formatting.**
-  If the target paragraph had multiple differently-formatted runs, or the
-  source had richer per-word formatting, that nuance is lost in favor of a
-  single uniform style.
+- **Blocks are headings, paragraphs, tables and images** (a paragraph that
+  holds only a picture). Headers/footers, footnotes and body-level content
+  controls pass through export untouched but aren't addressable.
+- **Empty paragraphs aren't blocks** — they're *extras* of the block before
+  them (`extract_layout`), so they move, duplicate and delete with it.
+- **Same-type replace takes its base look from the target's first text
+  run.** A target paragraph whose runs used several different fonts ends up
+  in the first run's font (the source's emphasis is kept - see §3).
 - **State is entirely in-memory** (`DOC_STORE`, a plain dict). A server
   restart loses every uploaded document. There's also no auth boundary —
   any client that knows a `doc_id` can read or mutate it.
@@ -368,7 +378,27 @@ extending the tool:
 
 ---
 
-## 8. Where an LLM layer would attach
+## 8. Tracked-changes export (`tracked.py`)
+
+`/export/<id>?track=1` builds a new document showing *original → current* as
+Word revisions. The original bytes are kept at upload time; the export diffs
+content rather than replaying history, so any sequence of edits and undos
+gives a correct result:
+
+1. Top-level elements are reduced to signatures and aligned with difflib.
+2. Runs of changed elements are paired by kind and text similarity (a small
+   order-preserving alignment), so an edited paragraph is matched with its
+   own earlier version.
+3. Paired paragraphs are diffed word-by-word over a char-level view of their
+   runs - kept/inserted text uses the current runs' formatting, deleted text
+   the original's - and a style change becomes `w:pPrChange`.
+4. Paired tables with the same column count are diffed row-by-row, then
+   cell-by-cell with the same paragraph logic.
+
+Accept All yields the current document and Reject All the original; the test
+suite checks both by simulating them on the exported XML.
+
+## 9. Where an LLM layer would attach
 
 Nothing in this codebase calls an LLM — every operation here is
 deterministic, tested Python. The natural extension point is a thin layer

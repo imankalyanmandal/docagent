@@ -11,6 +11,7 @@ pip install -r requirements.txt
 python make_fixtures.py     # exercises upload + every table/text operation end-to-end
 python tests/test_html_tables.py   # HTML table rowspan/colspan parsing (13 checks)
 python tests/test_backend_fixes.py # find & replace, request locking, upload limit (18 checks)
+python tests/test_fidelity.py      # formatting fidelity + tracked-changes export (33 checks)
 ```
 
 If that writes `fixtures.json` without error, the backend is working.
@@ -20,7 +21,7 @@ If that writes `fixtures.json` without error, the backend is working.
 ```bash
 cd tests
 npm install
-npm test              # runs ui_test.mjs (27 checks) + perf_test.mjs (3 checks)
+npm test              # runs ui_test.mjs (81 checks) + perf_test.mjs (3 checks)
 ```
 
 These load the **real** `templates/index.html` in a headless DOM, wire
