@@ -1,0 +1,12 @@
+{
+  "name": "docagent-ui-tests",
+  "version": "1.0.0",
+  "description": "Headless UI tests for the doc editor prototype",
+  "type": "module",
+  "scripts": {
+    "test": "node ui_test.mjs && node perf_test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}

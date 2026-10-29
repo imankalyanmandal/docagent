@@ -1,0 +1,1014 @@
+{
+  "upload": {
+    "blocks": {
+      "1": {
+        "id": "1",
+        "level": 1,
+        "order": 1,
+        "text": "Report",
+        "type": "header"
+      },
+      "1.1": {
+        "id": "1.1",
+        "order": 2,
+        "text": "Intro paragraph.",
+        "type": "paragraph"
+      },
+      "1.2": {
+        "id": "1.2",
+        "level": 2,
+        "order": 3,
+        "text": "Data",
+        "type": "header"
+      },
+      "1.2.1": {
+        "id": "1.2.1",
+        "order": 4,
+        "rows": [
+          [
+            "Name",
+            "Dept",
+            "Score"
+          ],
+          [
+            "Ann",
+            "Eng",
+            "10"
+          ],
+          [
+            "Bob",
+            "Ops",
+            "20"
+          ]
+        ],
+        "type": "table"
+      }
+    },
+    "can_undo": false,
+    "doc_id": "31734b5c",
+    "filename": "uitest.docx"
+  },
+  "upload_merge": {
+    "blocks": {
+      "1": {
+        "id": "1",
+        "level": 1,
+        "order": 1,
+        "text": "Report",
+        "type": "header"
+      },
+      "1.1": {
+        "id": "1.1",
+        "order": 2,
+        "text": "Intro paragraph.",
+        "type": "paragraph"
+      },
+      "1.2": {
+        "id": "1.2",
+        "level": 2,
+        "order": 3,
+        "text": "Data",
+        "type": "header"
+      },
+      "1.2.1": {
+        "id": "1.2.1",
+        "order": 4,
+        "rows": [
+          [
+            "N",
+            "V"
+          ],
+          [
+            "a",
+            "1"
+          ]
+        ],
+        "type": "table"
+      },
+      "1.2.2": {
+        "id": "1.2.2",
+        "order": 5,
+        "text": "Between.",
+        "type": "paragraph"
+      },
+      "1.2.3": {
+        "id": "1.2.3",
+        "order": 6,
+        "rows": [
+          [
+            "N",
+            "V"
+          ],
+          [
+            "b",
+            "2"
+          ]
+        ],
+        "type": "table"
+      }
+    },
+    "can_undo": false,
+    "doc_id": "8932850d",
+    "filename": "uitest_merge.docx"
+  },
+  "add_row": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ],
+            [
+              "",
+              "",
+              ""
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "5a058e4f"
+    },
+    "request": {
+      "doc_id": "5a058e4f",
+      "block_id": "1.2.1",
+      "operation": "add_row"
+    }
+  },
+  "add_column": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score",
+              "Status"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10",
+              ""
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20",
+              ""
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "feb2e8dc"
+    },
+    "request": {
+      "doc_id": "feb2e8dc",
+      "block_id": "1.2.1",
+      "operation": "add_column",
+      "header": "Status"
+    }
+  },
+  "delete_column": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Score"
+            ],
+            [
+              "Ann",
+              "10"
+            ],
+            [
+              "Bob",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "bb6369a6"
+    },
+    "request": {
+      "doc_id": "bb6369a6",
+      "block_id": "1.2.1",
+      "operation": "delete_column",
+      "index": 1
+    }
+  },
+  "delete_row": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "69905e9a"
+    },
+    "request": {
+      "doc_id": "69905e9a",
+      "block_id": "1.2.1",
+      "operation": "delete_row",
+      "index": 1
+    }
+  },
+  "sort": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "d71e4f75"
+    },
+    "request": {
+      "doc_id": "d71e4f75",
+      "block_id": "1.2.1",
+      "operation": "sort",
+      "column": 2
+    }
+  },
+  "transpose": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Ann",
+              "Bob"
+            ],
+            [
+              "Dept",
+              "Eng",
+              "Ops"
+            ],
+            [
+              "Score",
+              "10",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "2b5f2e72"
+    },
+    "request": {
+      "doc_id": "2b5f2e72",
+      "block_id": "1.2.1",
+      "operation": "transpose"
+    }
+  },
+  "set_content": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Zed",
+              "Ops",
+              "99"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "b28f8bc4"
+    },
+    "request": {
+      "doc_id": "b28f8bc4",
+      "block_id": "1.2.1"
+    }
+  },
+  "edit_text": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Edited intro text.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "68930dac"
+    },
+    "request": {
+      "doc_id": "68930dac",
+      "block_id": "1.1"
+    }
+  },
+  "upload_html_new": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Pasted Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Some bold text.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "order": 3,
+          "text": "Table 1: metrics",
+          "type": "paragraph"
+        },
+        "1.3": {
+          "id": "1.3",
+          "order": 4,
+          "rows": [
+            [
+              "N",
+              "V"
+            ],
+            [
+              "a",
+              "1"
+            ]
+          ],
+          "type": "table"
+        },
+        "1.4": {
+          "id": "1.4",
+          "order": 5,
+          "text": "one",
+          "type": "paragraph"
+        },
+        "1.5": {
+          "id": "1.5",
+          "order": 6,
+          "text": "two",
+          "type": "paragraph"
+        }
+      },
+      "can_undo": false,
+      "doc_id": "c9a021f3",
+      "filename": "froala.html"
+    },
+    "request": {
+      "html": "<h1>Pasted Report</h1><p>Some <strong>bold</strong> text.</p><p class='caption'>Table 1: metrics</p><table><tr><th>N</th><th>V</th></tr><tr><td>a</td><td>1</td></tr></table><ul><li>one</li><li>two</li></ul>"
+    }
+  },
+  "upload_html_append": {
+    "status": 200,
+    "body": {
+      "appended": true,
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        },
+        "2": {
+          "id": "2",
+          "level": 1,
+          "order": 5,
+          "text": "Pasted Report",
+          "type": "header"
+        },
+        "2.1": {
+          "id": "2.1",
+          "order": 6,
+          "text": "Some bold text.",
+          "type": "paragraph"
+        },
+        "2.2": {
+          "id": "2.2",
+          "order": 7,
+          "text": "Table 1: metrics",
+          "type": "paragraph"
+        },
+        "2.3": {
+          "id": "2.3",
+          "order": 8,
+          "rows": [
+            [
+              "N",
+              "V"
+            ],
+            [
+              "a",
+              "1"
+            ]
+          ],
+          "type": "table"
+        },
+        "2.4": {
+          "id": "2.4",
+          "order": 9,
+          "text": "one",
+          "type": "paragraph"
+        },
+        "2.5": {
+          "id": "2.5",
+          "order": 10,
+          "text": "two",
+          "type": "paragraph"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "0262b054"
+    },
+    "request": {
+      "append_to": "0262b054"
+    }
+  },
+  "duplicate": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        },
+        "2": {
+          "id": "2",
+          "level": 1,
+          "order": 5,
+          "text": "Report",
+          "type": "header"
+        },
+        "2.1": {
+          "id": "2.1",
+          "order": 6,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "2.2": {
+          "id": "2.2",
+          "level": 2,
+          "order": 7,
+          "text": "Data",
+          "type": "header"
+        },
+        "2.2.1": {
+          "id": "2.2.1",
+          "order": 8,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Ann",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "d5910df0"
+    },
+    "request": {
+      "doc_id": "d5910df0",
+      "block_ids": [
+        "1"
+      ]
+    }
+  },
+  "find_replace": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "Name",
+              "Dept",
+              "Score"
+            ],
+            [
+              "Zoe",
+              "Eng",
+              "10"
+            ],
+            [
+              "Bob",
+              "Ops",
+              "20"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "991c9763",
+      "replacements": 1
+    },
+    "request": {
+      "doc_id": "991c9763",
+      "find": "Ann",
+      "replace": "Zoe"
+    }
+  },
+  "merge_set_content": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "N",
+              "V"
+            ],
+            [
+              "a",
+              "1"
+            ],
+            [
+              "b",
+              "2"
+            ]
+          ],
+          "type": "table"
+        },
+        "1.2.2": {
+          "id": "1.2.2",
+          "order": 5,
+          "text": "Between.",
+          "type": "paragraph"
+        },
+        "1.2.3": {
+          "id": "1.2.3",
+          "order": 6,
+          "rows": [
+            [
+              "N",
+              "V"
+            ],
+            [
+              "b",
+              "2"
+            ]
+          ],
+          "type": "table"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "a8eb19fb"
+    },
+    "request": {
+      "doc_id": "a8eb19fb",
+      "block_id": "1.2.1",
+      "table_ids": [
+        "1.2.1",
+        "1.2.3"
+      ]
+    }
+  },
+  "merge_delete": {
+    "status": 200,
+    "body": {
+      "blocks": {
+        "1": {
+          "id": "1",
+          "level": 1,
+          "order": 1,
+          "text": "Report",
+          "type": "header"
+        },
+        "1.1": {
+          "id": "1.1",
+          "order": 2,
+          "text": "Intro paragraph.",
+          "type": "paragraph"
+        },
+        "1.2": {
+          "id": "1.2",
+          "level": 2,
+          "order": 3,
+          "text": "Data",
+          "type": "header"
+        },
+        "1.2.1": {
+          "id": "1.2.1",
+          "order": 4,
+          "rows": [
+            [
+              "N",
+              "V"
+            ],
+            [
+              "a",
+              "1"
+            ],
+            [
+              "b",
+              "2"
+            ]
+          ],
+          "type": "table"
+        },
+        "1.2.2": {
+          "id": "1.2.2",
+          "order": 5,
+          "text": "Between.",
+          "type": "paragraph"
+        }
+      },
+      "can_undo": true,
+      "doc_id": "a8eb19fb",
+      "removed": [
+        "1.2.3"
+      ]
+    }
+  }
+}
