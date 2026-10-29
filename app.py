@@ -34,9 +34,14 @@ from flask import Flask, request, jsonify, render_template, send_file
 from docx import Document
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+from docx.text.run import Run
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 from bs4 import BeautifulSoup
+
+import fidelity
+from fidelity import Importer
+import tracked
 
 app = Flask(__name__)
 
@@ -56,7 +61,7 @@ log = logging.getLogger("docagent")
 
 # A build stamp so you can confirm WHICH app.py is actually running. If the
 # log line below doesn't appear on startup, you're running an old file/process.
-BUILD_STAMP = "2026-10-29-findreplace-lock-fixes"
+BUILD_STAMP = "2026-10-29-formatting-fidelity"
 log.info("docagent backend starting - BUILD %s", BUILD_STAMP)
 
 MAX_UNDO_STEPS = 20   # per document; snapshots are whole-file bytes
@@ -116,61 +121,123 @@ def path_key(path):
     return ".".join(str(p) for p in path) if path else "0"
 
 
-def extract_blocks_and_refs(document):
+# Body children that are never blocks and never travel with a neighbouring
+# block: the final section properties, and body-level content controls (a
+# table of contents is usually one) which should stay where the author put it.
+_FIXED_BODY_TAGS = {qn("w:sectPr"), qn("w:sdt")}
+
+_A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+
+
+def paragraph_images(p_el):
+    """Relationship ids of the pictures in a paragraph (DrawingML + legacy VML)."""
+    rids = [b.get(fidelity.REL_ATTRS[0]) for b in p_el.iter(f"{{{_A_NS}}}blip")]
+    rids += [i.get(fidelity.REL_ATTRS[2]) for i in
+             p_el.iter("{urn:schemas-microsoft-com:vml}imagedata")]
+    return [r for r in rids if r]
+
+
+def has_drawing(p_el):
+    return p_el.find(".//" + qn("w:drawing")) is not None or \
+        p_el.find(".//" + qn("w:pict")) is not None
+
+
+def extract_layout(document):
     """
     Walk the document in order and assign each block a hierarchical key based
     on heading structure ("1", "1.1", "1.2.1", ...).
 
-    Returns (blocks, refs):
+    Returns (blocks, refs, extras):
       blocks : plain JSON dict for the browser
       refs   : block_id -> the live Paragraph/Table object, so edits can be
                applied in place without losing formatting
+      extras : block_id -> body elements that BELONG to that block but aren't
+               blocks themselves: the empty spacing paragraphs, page breaks and
+               bookmarks that follow it. Move/delete/duplicate/insert carry
+               these along, so a moved section keeps its spacing instead of
+               leaving a trail of blank lines behind.
+
+    Block types: header, paragraph, table, and image - a paragraph whose only
+    content is a picture/drawing. Image blocks are selectable and move with
+    their section like everything else (previously they were invisible to the
+    parser and got left behind).
 
     Called fresh after EVERY mutation, so ids always reflect the document's
     real current structure.
     """
-    blocks, refs = {}, {}
+    blocks, refs, extras = {}, {}, {}
     order = 0
     current_path = []
     counts = {}
+    last_key = None
 
     def next_path(parent_path):
         parent_key = tuple(parent_path)
         counts[parent_key] = counts.get(parent_key, 0) + 1
         return parent_path + [counts[parent_key]]
 
-    for item in iter_block_items(document):
+    def attach(child):
+        if last_key is not None:
+            extras.setdefault(last_key, []).append(child)
+
+    for child in document.element.body.iterchildren():
+        if child.tag in _FIXED_BODY_TAGS:
+            continue
+        if child.tag == qn('w:p'):
+            item = Paragraph(child, document)
+        elif child.tag == qn('w:tbl'):
+            item = Table(child, document)
+        else:
+            attach(child)        # bookmarks, custom XML etc. ride along
+            continue
+
         order += 1
 
         if isinstance(item, Paragraph):
             level = heading_level(item)
+            text = item.text
 
-            if level is not None:
-                text = item.text.strip()
-                if not text:
-                    continue
+            if level is not None and text.strip():
                 current_path = next_path(current_path[: level - 1])
                 key = path_key(current_path)
                 blocks[key] = {"id": key, "type": "header", "level": level,
-                               "text": text, "order": order}
+                               "text": text.strip(), "order": order}
                 refs[key] = item
+                last_key = key
                 continue
 
-            if not item.text.strip():
+            if not text.strip():
+                if has_drawing(child):
+                    key = path_key(next_path(current_path))
+                    blocks[key] = {"id": key, "type": "image", "text": "",
+                                   "order": order, "images": paragraph_images(child)}
+                    refs[key] = item
+                    last_key = key
+                else:
+                    attach(child)  # spacing paragraph / page break
                 continue
+
             key = path_key(next_path(current_path))
             blocks[key] = {"id": key, "type": "paragraph",
-                           "text": item.text, "order": order}
+                           "text": text, "order": order}
             refs[key] = item
+            last_key = key
 
-        elif isinstance(item, Table):
+        else:
             key = path_key(next_path(current_path))
             blocks[key] = {
                 "id": key, "type": "table", "order": order,
                 "rows": [[_cell_text(cell) for cell in row.cells] for row in item.rows],
             }
             refs[key] = item
+            last_key = key
 
+    return blocks, refs, extras
+
+
+def extract_blocks_and_refs(document):
+    """(blocks, refs) - see extract_layout."""
+    blocks, refs, _ = extract_layout(document)
     return blocks, refs
 
 
@@ -193,7 +260,13 @@ def _cell_text(cell):
 
 def resync(doc_entry):
     """Re-derive blocks/refs from the live document. Call after any mutation."""
-    doc_entry["blocks"], doc_entry["refs"] = extract_blocks_and_refs(doc_entry["document"])
+    doc_entry["blocks"], doc_entry["refs"], doc_entry["extras"] = \
+        extract_layout(doc_entry["document"])
+
+
+def block_elements(entry, block_id):
+    """A block's own element plus the spacing/extras that travel with it."""
+    return [entry["refs"][block_id]._element] + entry.get("extras", {}).get(block_id, [])
 
 
 # ---------------------------------------------------------------------------
@@ -240,18 +313,12 @@ def mutation(entry):
 
 def set_paragraph_text(paragraph, new_text):
     """
-    Set a paragraph's text WITHOUT resetting it to a bare unformatted run.
-    Reuses the first existing run (keeping its font/size/bold/color) and
-    drops the rest. Per-word formatting from the SOURCE isn't carried over,
-    but the TARGET's own style survives untouched.
+    Set a paragraph's text WITHOUT resetting it to a bare unformatted run:
+    the first text run keeps its font/size/bold/colour and takes the new
+    text. Inline images, fields and other non-text runs are left in place.
+    (See fidelity.set_plain_text.)
     """
-    runs = paragraph.runs
-    if runs:
-        runs[0].text = new_text
-        for extra in runs[1:]:
-            extra._element.getparent().remove(extra._element)
-    else:
-        paragraph.add_run(new_text)
+    fidelity.set_plain_text(paragraph, new_text)
 
 
 def set_heading_level(paragraph, level):
@@ -392,11 +459,19 @@ def op_replace(base_entry, base_block_id, source_entry, source_block_id):
         isinstance(target_ref, Paragraph) and isinstance(source_ref, Paragraph)
     )
 
+    if target_ref._element is source_ref._element:
+        return                     # replacing a block with itself is a no-op
+
+    importer = Importer(source_entry["document"], base_entry["document"])
+
     if same_kind and isinstance(target_ref, Table):
         set_table_content(target_ref, source_block["rows"])
+        fidelity.copy_table_content(target_ref, source_ref, importer)
 
     elif same_kind:
-        set_paragraph_text(target_ref, source_block["text"])
+        # source's runs (per-word bold/italic, inline images, links), restyled
+        # onto the target's base font - see fidelity.copy_paragraph_content
+        fidelity.copy_paragraph_content(target_ref, source_ref, importer)
         # a header target keeps being a header; adopt the source's level if
         # the source is also a header, otherwise keep the target's own level
         if target_block["type"] == "header":
@@ -410,7 +485,7 @@ def op_replace(base_entry, base_block_id, source_entry, source_block_id):
         # cross-type: swap the element wholesale, preserving source formatting
         target_element = target_ref._element
         parent = target_element.getparent()
-        clone = deepcopy(source_ref._element)
+        clone = importer.import_element(source_ref._element)
         parent.insert(parent.index(target_element), clone)
         parent.remove(target_element)
 
@@ -434,7 +509,7 @@ def expand_with_descendants(blocks, block_ids):
 def ordered_elements(entry, block_ids):
     """XML elements for the given blocks, in document order."""
     ids = sorted(block_ids, key=lambda b: entry["blocks"][b]["order"])
-    return [entry["refs"][b]._element for b in ids], ids
+    return [el for b in ids for el in block_elements(entry, b)], ids
 
 
 # --- Move / reorder ---------------------------------------------------------
@@ -777,14 +852,13 @@ def op_delete(doc_entry, block_ids, cascade=True):
 
     removed = []
     for block_id in targets:
-        ref = doc_entry["refs"].get(block_id)
-        if ref is None:
+        if doc_entry["refs"].get(block_id) is None:
             continue
-        element = ref._element
-        parent = element.getparent()
-        if parent is not None:
-            parent.remove(element)
-            removed.append(block_id)
+        for element in block_elements(doc_entry, block_id):
+            parent = element.getparent()
+            if parent is not None:
+                parent.remove(element)
+        removed.append(block_id)
     return removed
 
 
@@ -794,18 +868,22 @@ def op_insert_after(base_entry, anchor_block_id, source_entry, source_block_ids)
     splice them into the base document after the anchor, in the order they
     appear in the source document.
     """
-    anchor_element = base_entry["refs"][anchor_block_id]._element
-    parent = anchor_element.getparent()
+    # land after the anchor's own trailing spacing, not between the two
+    cursor = block_elements(base_entry, anchor_block_id)[-1]
+    parent = cursor.getparent()
 
     ordered_ids = sorted(
         source_block_ids, key=lambda bid: source_entry["blocks"][bid]["order"]
     )
 
-    cursor = anchor_element
+    # one importer for the whole insert, so list items from one source list
+    # stay one list (numbering continues) and a repeated image is stored once
+    importer = Importer(source_entry["document"], base_entry["document"])
     for source_block_id in ordered_ids:
-        clone = deepcopy(source_entry["refs"][source_block_id]._element)
-        parent.insert(parent.index(cursor) + 1, clone)
-        cursor = clone
+        for element in block_elements(source_entry, source_block_id):
+            clone = importer.import_element(element)
+            parent.insert(parent.index(cursor) + 1, clone)
+            cursor = clone
 
     return ordered_ids
 
@@ -825,14 +903,23 @@ def op_duplicate(entry, block_ids):
 
     # insert the clones after the LAST element of the selection, preserving
     # the selection's internal order
-    last_element = entry["refs"][ordered_ids[-1]]._element
-    parent = last_element.getparent()
+    cursor = block_elements(entry, ordered_ids[-1])[-1]
+    parent = cursor.getparent()
 
-    cursor = last_element
     for block_id in ordered_ids:
-        clone = deepcopy(entry["refs"][block_id]._element)
-        parent.insert(parent.index(cursor) + 1, clone)
-        cursor = clone
+        for element in block_elements(entry, block_id):
+            clone = _strip_bookmarks(deepcopy(element))
+            parent.insert(parent.index(cursor) + 1, clone)
+            cursor = clone
+
+
+def _strip_bookmarks(element):
+    """Bookmark names must be unique; a duplicated copy drops its bookmarks
+    (the original keeps them, so cross-references still resolve)."""
+    for tag in ("w:bookmarkStart", "w:bookmarkEnd"):
+        for b in list(element.iter(qn(tag))):
+            b.getparent().remove(b)
+    return element
 
 
 def _replace_in_paragraph(paragraph, find, replace, case_sensitive):
@@ -853,7 +940,9 @@ def _replace_in_paragraph(paragraph, find, replace, case_sensitive):
     flags = 0 if case_sensitive else re.IGNORECASE
     pattern = re.compile(re.escape(find), flags)
 
-    runs = paragraph.runs
+    # direct runs plus runs inside hyperlinks/smart tags, in document order
+    runs = [Run(r, paragraph) for r in paragraph._p.xpath(
+        "./w:r | ./w:hyperlink/w:r | ./w:smartTag/w:r | ./w:ins/w:r")]
     texts = [r.text for r in runs]
     matches = list(pattern.finditer("".join(texts)))
     if not matches:
@@ -1266,7 +1355,11 @@ def upload():
 def _store_document(document, filename):
     """Register a python-docx Document in DOC_STORE and return its id."""
     doc_id = str(uuid.uuid4())[:8]
-    entry = {"filename": filename, "document": document, "undo": []}
+    buf = io.BytesIO()
+    document.save(buf)
+    # "original" is the baseline for tracked-changes export
+    entry = {"filename": filename, "document": document, "undo": [],
+             "original": buf.getvalue()}
     resync(entry)
     DOC_STORE[doc_id] = entry
     # crude memory bound: evict oldest docs (dicts keep insertion order)
@@ -1284,10 +1377,11 @@ def append_document_body(target_entry, source_document):
     target_body = target_entry["document"].element.body
     # insert before sectPr (the trailing section properties), if present
     sectpr = target_body.find(qn('w:sectPr'))
+    importer = Importer(source_document, target_entry["document"])
     for child in list(source_document.element.body.iterchildren()):
         if child.tag == qn('w:sectPr'):
             continue
-        clone = deepcopy(child)
+        clone = importer.import_element(child)
         if sectpr is not None:
             sectpr.addprevious(clone)
         else:
@@ -1556,18 +1650,39 @@ def export(doc_id):
         if doc_id not in DOC_STORE:
             return jsonify({"error": "unknown doc_id"}), 400
         entry = DOC_STORE[doc_id]
+        track = request.args.get("track") in ("1", "true", "yes")
         buf = io.BytesIO()
-        entry["document"].save(buf)   # the SAME document object - never rebuilt
+        if track:
+            # a NEW document showing original -> current as Word revisions;
+            # the live document itself is untouched
+            author = (request.args.get("author") or "docagent").strip()[:64] or "docagent"
+            tracked.build_tracked_document(
+                entry["original"], entry["document"], author=author).save(buf)
+        else:
+            entry["document"].save(buf)   # the SAME document object - never rebuilt
         filename = entry["filename"]
         _log_export_merges(doc_id, entry["document"])
     buf.seek(0)
 
+    suffix = "_tracked.docx" if track else "_edited.docx"
     return send_file(
         buf,
         as_attachment=True,
-        download_name=filename.rsplit(".", 1)[0] + "_edited.docx",
+        download_name=filename.rsplit(".", 1)[0] + suffix,
         mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     )
+
+
+@app.route("/media/<doc_id>/<rid>", methods=["GET"])
+def media(doc_id, rid):
+    """Serve an image embedded in a document, for previewing image blocks."""
+    with STORE_LOCK:
+        entry = DOC_STORE.get(doc_id)
+        rel = entry["document"].part.rels.get(rid) if entry else None
+        if rel is None or rel.is_external or not rel.reltype.endswith("/image"):
+            return jsonify({"error": "unknown image"}), 404
+        blob, content_type = rel.target_part.blob, rel.target_part.content_type
+    return send_file(io.BytesIO(blob), mimetype=content_type, max_age=3600)
 
 
 def _log_export_merges(doc_id, document):

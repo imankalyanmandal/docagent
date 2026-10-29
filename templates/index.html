@@ -125,6 +125,9 @@
   .header-text[data-level="2"] { font-size:16px; }
   .header-text[data-level="3"] { font-size:14px; }
   .paragraph-text { font-size:13px; line-height:1.5; }
+  .image-block { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .image-block img { max-width:240px; max-height:160px; border:1px solid #e3e3e3; border-radius:4px; background:#fff; }
+  .image-fallback { font-size:12px; color:#888; padding:6px 10px; border:1px dashed #ccc; border-radius:4px; }
   table.doc-table { border-collapse:collapse; margin:4px 0; font-size:12px; }
   table.doc-table td { border:1px solid #ddd; padding:4px 8px; }
   table.doc-table tr:first-child td { background:#fafafa; font-weight:600; }
@@ -177,6 +180,7 @@
   <button id="findrep-btn" disabled onclick="openFindReplace()" title="Find &amp; replace across the base document">Find &amp; replace&hellip;</button>
   <button id="undo-btn" disabled onclick="doUndo()">Undo</button>
   <button id="export-btn" disabled onclick="doExport()">Export .docx</button>
+  <button id="export-tracked-btn" disabled onclick="doExport(true)" title="Download a .docx where every edit since upload is a Word tracked change (accept/reject in Word)">Export with tracked changes</button>
   <button id="outline-btn" onclick="toggleOutline()" title="Show a jumpable document outline">Outline</button>
   <button id="focus-btn" onclick="toggleFocusMode()" title="Hide the Other document and edit the base full-width">Focus base &#9974;</button>
   <span id="status"></span>
@@ -462,7 +466,7 @@ function signature(blocks) {
     .sort((a,b)=>a.order-b.order)
     .map(b => b.type==='table'
       ? `${b.id}:t:${b.order}:${b.rows.length}x${b.rows[0]?.length||0}:${b.rows.flat().join('\u0001')}`
-      : `${b.id}:${b.type}:${b.order}:${b.level||''}:${b.text}`)
+      : `${b.id}:${b.type}:${b.order}:${b.level||''}:${b.text}:${(b.images||[]).join(',')}`)
     .join('\u0002');
 }
 
@@ -547,6 +551,21 @@ function buildBlockNode(pane, block) {
     });
     scroller.appendChild(table);
     wrapper.appendChild(scroller);
+  } else if (block.type === 'image') {
+    // picture paragraph: preview each embedded image (formats a browser
+    // can't show, like EMF, fall back to a labelled placeholder)
+    const box = document.createElement('div');
+    box.className = 'image-block';
+    const fallback = () => { const f = document.createElement('span'); f.className = 'image-fallback'; f.textContent = 'Image'; return f; };
+    if (!(block.images || []).length) box.appendChild(fallback());
+    (block.images || []).forEach(rid => {
+      const img = document.createElement('img');
+      img.alt = 'Image'; img.loading = 'lazy';
+      img.src = `/media/${state[pane].doc_id}/${encodeURIComponent(rid)}`;
+      img.addEventListener('error', () => img.replaceWith(fallback()));
+      box.appendChild(img);
+    });
+    wrapper.appendChild(box);
   } else {
     const el = document.createElement('div');
     el.className = block.type==='header' ? 'header-text' : 'paragraph-text';
@@ -562,7 +581,10 @@ function buildBlockNode(pane, block) {
 
     const editBtn = document.createElement('button');
     editBtn.textContent = '\u270E';
-    if (block.type === 'table') {
+    if (block.type === 'image') {
+      editBtn.disabled = true;
+      editBtn.title = 'Images can be moved, duplicated, deleted or replaced, not text-edited';
+    } else if (block.type === 'table') {
       editBtn.title = 'Edit table (values, sorting, rows/columns)';
       editBtn.addEventListener('click', e => { e.stopPropagation(); openSingleTableEditor(block.id); });
     } else {
@@ -653,6 +675,7 @@ function updateToolbar() {
 
   $('undo-btn').disabled    = !state.base.can_undo;
   $('export-btn').disabled  = !state.base.doc_id;
+  $('export-tracked-btn').disabled = !state.base.doc_id;
   updateTablePanel();
   if (!$('outline-drawer').classList.contains('hidden')) renderOutline();
 }
@@ -796,18 +819,19 @@ function jumpToBlock(blockId) {
   node.classList.remove('flash'); void node.offsetWidth; node.classList.add('flash');
 }
 
-const doExport = () => {
+const doExport = (tracked = false) => {
   if (!state.base.doc_id) return;
   // trigger the download WITHOUT navigating the page away: a temporary
   // anchor with the download attribute lets the browser fetch the file and
   // save it while the current page stays exactly where it is.
   const a = document.createElement('a');
-  a.href = `/export/${state.base.doc_id}`;
+  a.href = `/export/${state.base.doc_id}` + (tracked ? '?track=1' : '');
   a.download = '';                 // hint the browser to download, not navigate
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  setStatus('Export started - check your downloads');
+  setStatus(tracked ? 'Tracked-changes export started - open it in Word to review each change'
+                    : 'Export started - check your downloads');
 };
 
 // Full-screen base editing: hides the Other-document pane so the base gets
