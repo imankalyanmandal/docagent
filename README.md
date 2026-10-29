@@ -7,6 +7,15 @@ python app.py
 ```
 Open http://localhost:5000
 
+**Server settings (environment variables):**
+| Variable | Default | Meaning |
+|---|---|---|
+| `DOCAGENT_HOST` | `127.0.0.1` | Bind address. Set `0.0.0.0` to open it to other machines on your network. |
+| `DOCAGENT_PORT` | `5000` | Port. |
+| `DOCAGENT_FLASK_DEBUG` | `0` | `1` turns on Flask debug mode - only honoured when bound to localhost. |
+| `DOCAGENT_MAX_UPLOAD_MB` | `25` | Largest accepted upload / request body. |
+| `DOCAGENT_DEBUG` | `1` | Verbose `[HTML]`/`[TABLE]` logging; `0` to quieten. |
+
 **If you've run this before and don't see new buttons/features:** stop the
 old `python app.py` process completely (Ctrl+C, then confirm it's not still
 running), replace the old folder's files with these ones, then start it
@@ -212,6 +221,7 @@ See `TESTING.md`. In short:
 
 ```bash
 python make_fixtures.py    # regenerate backend response fixtures if the API changes
+python tests/test_backend_fixes.py   # find & replace, locking, upload-limit regressions
 cd tests
 npm install                 # jsdom for the headless UI tests
 npm test                    # runs ui_test.mjs (27 checks) + perf_test.mjs (3 checks)

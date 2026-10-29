@@ -10,6 +10,7 @@ running server.
 pip install -r requirements.txt
 python make_fixtures.py     # exercises upload + every table/text operation end-to-end
 python tests/test_html_tables.py   # HTML table rowspan/colspan parsing (13 checks)
+python tests/test_backend_fixes.py # find & replace, request locking, upload limit (18 checks)
 ```
 
 If that writes `fixtures.json` without error, the backend is working.

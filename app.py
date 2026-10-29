@@ -25,6 +25,7 @@ import io
 import re
 import uuid
 import logging
+import threading
 from copy import deepcopy
 from contextlib import contextmanager
 from functools import wraps
@@ -55,11 +56,21 @@ log = logging.getLogger("docagent")
 
 # A build stamp so you can confirm WHICH app.py is actually running. If the
 # log line below doesn't appear on startup, you're running an old file/process.
-BUILD_STAMP = "2026-08-15-tablemerge-v2"
+BUILD_STAMP = "2026-10-29-findreplace-lock-fixes"
 log.info("docagent backend starting - BUILD %s", BUILD_STAMP)
 
 MAX_UNDO_STEPS = 20   # per document; snapshots are whole-file bytes
 MAX_DOCS = 50         # oldest docs are evicted past this (prototype memory bound)
+MAX_UPLOAD_MB = int(_os.environ.get("DOCAGENT_MAX_UPLOAD_MB", "25"))
+app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD_MB * 1024 * 1024
+
+# The dev server runs threaded, and python-docx Documents are not thread-safe.
+# Every request that reads or mutates DOC_STORE or a live Document holds this
+# lock, so two requests (a double-click, or an agent firing calls in parallel)
+# can never interleave edits on the same XML tree. One lock for the whole store
+# keeps cross-document ops (replace/insert read one doc while writing another)
+# simple; per-request work is milliseconds, so contention is a non-issue here.
+STORE_LOCK = threading.RLock()
 
 # in-memory store: doc_id -> {"filename", "document", "refs", "blocks", "undo"}
 #   document : the live python-docx Document object
@@ -826,37 +837,53 @@ def op_duplicate(entry, block_ids):
 
 def _replace_in_paragraph(paragraph, find, replace, case_sensitive):
     """
-    Replace text within a paragraph while keeping formatting where possible.
-    Works run-by-run first (so a match inside one run keeps that run's style);
-    falls back to a whole-paragraph rewrite when a match spans runs. Returns
-    the number of replacements made.
+    Replace text within a paragraph while keeping every run's formatting.
+
+    Matches are found on the paragraph's joined run text, so a match that
+    spans runs is handled exactly like one inside a single run - and one
+    paragraph can contain both kinds. For each match the replacement goes into
+    the run where the match starts (taking that run's style) and the matched
+    characters are cut from any following runs it spilled into. Text outside
+    the matches is never touched, so a bold word elsewhere stays bold.
+
+    The replacement is inserted literally, never as a regex template, so
+    backslashes (e.g. "C:\\docs") and "\\1" are safe. Returns the number of
+    replacements made.
     """
     flags = 0 if case_sensitive else re.IGNORECASE
     pattern = re.compile(re.escape(find), flags)
 
-    # fast path: try per-run replacement (preserves each run's own formatting)
-    made = 0
-    spans_runs = False
-    for run in paragraph.runs:
-        if pattern.search(run.text):
-            run.text, n = pattern.subn(replace, run.text)
-            made += n
-    # detect a match that spans runs: reconstruct full text and compare counts
-    full = paragraph.text
-    total_in_full = len(pattern.findall(full))
-    if total_in_full > made:
-        # a match crosses run boundaries - rewrite the whole paragraph text on
-        # the first run (loses per-word styling for this paragraph only)
-        spans_runs = True
-        new_full = pattern.sub(replace, full)
-        if paragraph.runs:
-            paragraph.runs[0].text = new_full
-            for extra in paragraph.runs[1:]:
-                extra._element.getparent().remove(extra._element)
-        else:
-            paragraph.add_run(new_full)
-        made = total_in_full
-    return made
+    runs = paragraph.runs
+    texts = [r.text for r in runs]
+    matches = list(pattern.finditer("".join(texts)))
+    if not matches:
+        return 0
+
+    # original [start, end) offsets of each run within the joined text
+    spans = []
+    pos = 0
+    for t in texts:
+        spans.append((pos, pos + len(t)))
+        pos += len(t)
+
+    # Right-to-left: each edit only changes text at or after its match start,
+    # so the original offsets stay valid for every match still to process.
+    for m in reversed(matches):
+        m_start, m_end = m.start(), m.end()
+        first = True
+        for i, (r_start, r_end) in enumerate(spans):
+            if r_end <= m_start or r_start >= m_end:
+                continue
+            a = max(m_start, r_start) - r_start
+            b = min(m_end, r_end) - r_start
+            t = texts[i]
+            texts[i] = t[:a] + (replace if first else "") + t[b:]
+            first = False
+
+    for run, new_text in zip(runs, texts):
+        if run.text != new_text:
+            run.text = new_text
+    return len(matches)
 
 
 def op_find_replace(entry, find, replace, case_sensitive=False, scope="all"):
@@ -875,8 +902,15 @@ def op_find_replace(entry, find, replace, case_sensitive=False, scope="all"):
                 total += _replace_in_paragraph(item, find, replace, case_sensitive)
         elif isinstance(item, Table):
             if scope in ("all", "tables"):
+                # A merged cell appears once per row/column it spans, but it
+                # is one <w:tc> - visit each real cell only once, otherwise a
+                # replacement containing the search text compounds per row.
+                seen = set()
                 for row in item.rows:
                     for cell in row.cells:
+                        if cell._tc in seen:
+                            continue
+                        seen.add(cell._tc)
                         for p in cell.paragraphs:
                             total += _replace_in_paragraph(p, find, replace, case_sensitive)
     return total
@@ -901,7 +935,8 @@ def json_route(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         try:
-            return fn(request.get_json(force=True) or {}, *args, **kwargs)
+            with STORE_LOCK:
+                return fn(request.get_json(force=True) or {}, *args, **kwargs)
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
     return wrapper
@@ -1194,6 +1229,8 @@ def handle_uncaught(e):
     """
     from werkzeug.exceptions import HTTPException
     if isinstance(e, HTTPException):
+        if e.code == 413:
+            return jsonify({"error": f"file too large - the limit is {MAX_UPLOAD_MB} MB"}), 413
         return e   # keep normal 404s etc. as-is
     import traceback
     traceback.print_exc()   # full trace still lands in the server console
@@ -1219,8 +1256,9 @@ def upload():
     except Exception:
         return jsonify({"error": "could not read that file - is it a valid .docx?"}), 400
 
-    doc_id = _store_document(document, f.filename)
-    payload = doc_state(doc_id)
+    with STORE_LOCK:
+        doc_id = _store_document(document, f.filename)
+        payload = doc_state(doc_id)
     payload["filename"] = f.filename
     return jsonify(payload)
 
@@ -1514,18 +1552,32 @@ def undo(data):
 
 @app.route("/export/<doc_id>", methods=["GET"])
 def export(doc_id):
-    if doc_id not in DOC_STORE:
-        return jsonify({"error": "unknown doc_id"}), 400
+    with STORE_LOCK:
+        if doc_id not in DOC_STORE:
+            return jsonify({"error": "unknown doc_id"}), 400
+        entry = DOC_STORE[doc_id]
+        buf = io.BytesIO()
+        entry["document"].save(buf)   # the SAME document object - never rebuilt
+        filename = entry["filename"]
+        _log_export_merges(doc_id, entry["document"])
+    buf.seek(0)
 
-    entry = DOC_STORE[doc_id]
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=filename.rsplit(".", 1)[0] + "_edited.docx",
+        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
 
+
+def _log_export_merges(doc_id, document):
     # Diagnostic: report the real merged-cell structure of each table in the
     # document being exported. If a table has vertically-merged cells, the same
     # underlying <w:tc> element is shared across rows - we count distinct cells
     # per column so you can confirm the EXPORTED file has true merges even
     # though the on-screen editor grid shows repeated values.
     try:
-        for ti, tbl in enumerate(entry["document"].tables):
+        for ti, tbl in enumerate(document.tables):
             n_rows, n_cols = len(tbl.rows), len(tbl.columns)
             merged_cols = []
             for c in range(n_cols):
@@ -1537,17 +1589,6 @@ def export(doc_id):
     except Exception as e:
         log.warning("[EXPORT] merge-inspection failed: %s", e)
 
-    buf = io.BytesIO()
-    entry["document"].save(buf)   # the SAME document object - never rebuilt
-    buf.seek(0)
-
-    return send_file(
-        buf,
-        as_attachment=True,
-        download_name=entry["filename"].rsplit(".", 1)[0] + "_edited.docx",
-        mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-
 
 if __name__ == "__main__":
     # use_reloader=False is deliberate: the auto-reloader restarts the whole
@@ -1556,4 +1597,16 @@ if __name__ == "__main__":
     # with no response at all - this is what "upload just hangs forever"
     # usually turns out to be. threaded=True lets the dev server handle more
     # than one request at a time.
-    app.run(debug=True, use_reloader=False, threaded=True, host="0.0.0.0", port=5000)
+    #
+    # Debug mode and the bind address are opt-in. Flask's debug mode must never
+    # be reachable from other machines, so by default the server only listens
+    # on this computer (127.0.0.1). Set DOCAGENT_HOST=0.0.0.0 to share it on
+    # your network, and DOCAGENT_FLASK_DEBUG=1 only for local debugging.
+    host = _os.environ.get("DOCAGENT_HOST", "127.0.0.1")
+    port = int(_os.environ.get("DOCAGENT_PORT", "5000"))
+    debug = _os.environ.get("DOCAGENT_FLASK_DEBUG", "0") == "1"
+    if debug and host not in ("127.0.0.1", "localhost"):
+        log.warning("Flask debug mode is ON while listening on %s - anyone on the "
+                    "network could reach the debugger. Turning debug OFF.", host)
+        debug = False
+    app.run(debug=debug, use_reloader=False, threaded=True, host=host, port=port)
