@@ -25,9 +25,13 @@ from Flask, and a stale tab or a server still running old code will look
 identical to "nothing changed" even when the files on disk are correct.
 
 ## What you can do
-Upload a **Base document** (edited + exported) and an **Other document**
-(content source). Both render as checkbox-selectable blocks with
-hierarchical ids like `1.2.1`.
+Open a **Base document** (edited + exported) and a **Source document**
+(called "Other" in the API and older notes) with **Open .docx**, or drag a
+.docx onto either page. Both render as pages of checkbox-selectable blocks,
+with each block's hierarchical id (`1.2.1`) in the left margin like a clause
+number. Undo and the two exports live in the top bar; actions are grouped by
+what they work on (between documents / in the base / review); messages
+appear in the status bar at the bottom. Esc closes any dialog.
 
 **Cross-document**
 - **Replace (1->1)** - one checked each side; overwrites the base block's
