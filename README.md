@@ -63,6 +63,24 @@ hierarchical ids like `1.2.1`.
   reordering, and adding/deleting rows & columns happen here - not in the
   panel outside.
 
+**Merged cells (colspan / rowspan)** are edited structurally, so they stay
+merged and the file stays valid:
+- a new **column inside a colspan widens it**; a new **row inside a rowspan
+  extends it** (like Word); deleting the first row of a rowspan hands the
+  merged content to the row below; deleting a column under a span narrows it
+- editing a merged cell's value in **any** position it covers in the editor
+  grid updates the merged cell
+- **rows move as units** (sort, reorder in the popup), keeping their own
+  formatting and colspans; cells whose value didn't change aren't rewritten,
+  so their mixed formatting survives
+- **transpose** transposes the merges too; **merging tables** re-creates the
+  appended table's merges; **replacing** a table with a merged one copies
+  its merges
+- **sorting is refused when a rowspan crosses the data rows** - tearing a
+  merged cell apart is a judgement call, so the tool says so instead of
+  guessing
+- adding columns keeps the table's total width, so it stays inside the page
+
 **Merge tables** - check **two or more tables**, then **Merge selected
 tables…** in the toolbar. Opens the same popup pre-filled with every checked
 table's rows combined (duplicate header auto-dropped), each row tagged with
@@ -255,6 +273,7 @@ See `TESTING.md`. In short:
 python make_fixtures.py    # regenerate backend response fixtures if the API changes
 python tests/test_backend_fixes.py   # find & replace, locking, upload-limit regressions
 python tests/test_fidelity.py        # formatting fidelity + tracked-changes export
+python tests/run_all.py              # ...or every Python suite at once (311 checks)
 cd tests
 npm install                 # jsdom for the headless UI tests
 npm test                    # runs ui_test.mjs (81 checks) + perf_test.mjs (3 checks)

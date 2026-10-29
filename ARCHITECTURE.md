@@ -378,6 +378,30 @@ extending the tool:
 
 ---
 
+## 7b. Merged cells: editing structure, not a text grid (`tables.py`)
+
+Table operations used to rebuild a table from a plain value matrix ("write
+row r, column c"). That only works while every row has one cell per column.
+With merged cells it corrupted the table on the first edit: rows ended up
+covering different numbers of grid columns, values landed in the wrong
+cells, and Word would report the file as damaged.
+
+`tables.py` edits the real structure instead. Its one primitive is
+`apply_layout(table, row_map, col_map)`: each new row/column names the old
+one it comes from, or `None` for a new one. Kept rows and cells are *moved*,
+so their formatting and merges survive; a new column inside a colspan widens
+it; a new row inside a rowspan extends it; `fix_vmerges` repairs vertical
+merges whose rows were removed or moved apart (and the cell that takes over
+a merge gets its content). `write_values` then rewrites only cells whose
+value changed.
+
+Every op is a small mapping: delete row *i* = all rows except *i*; sort = a
+permutation of the data rows; the editor popup's `set_content` infers the
+maps from the old and new grids (`infer_maps`: unchanged rows map directly,
+rows with identical content elsewhere count as moved, the rest are edits in
+place). Re-shaping ops (transpose, replace-with-another-table) use
+`flatten` + `apply_regions` to drop and re-create merges explicitly.
+
 ## 8. Tracked-changes export (`tracked.py`)
 
 `/export/<id>?track=1` builds a new document showing *original → current* as
