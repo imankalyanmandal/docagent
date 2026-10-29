@@ -2,251 +2,451 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Doc Editor Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>docagent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Carlito:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
 <style>
-  :root { --line:#e5e5e8; --muted:#888; --accent:#1a73e8; }
-  body { font-family:-apple-system,Segoe UI,sans-serif; max-width:1280px; margin:28px auto; color:#1a1a1a; }
-  h1 { font-size:20px; margin-bottom:4px; }
-  h2 { font-size:15px; margin-bottom:6px; }
-  .sub { color:var(--muted); font-size:13px; margin-top:0; }
-  .upload-row { display:flex; gap:20px; margin-bottom:14px; }
-  .upload-box { flex:1; border:2px dashed var(--line); padding:12px; border-radius:8px; text-align:center;
-    transition:border-color .18s ease, background .18s ease, box-shadow .18s ease; }
-  .upload-box:hover { border-color:#adc8f5; }
-  .upload-box.filled { border-color:#8ab4f8; background:#f5f9ff; }
-  .fname { font-size:11px; color:var(--muted); margin-top:6px; word-break:break-all; }
-  .toolbar { display:flex; gap:10px; align-items:center; margin:14px 0; padding:11px; background:#f7f7f9; border-radius:8px; flex-wrap:wrap; }
-  button { padding:7px 13px; border-radius:6px; border:1px solid #ccc; background:#fff; cursor:pointer; font-size:13px;
-    transition:background .15s ease, border-color .15s ease, box-shadow .15s ease, transform .06s ease, color .15s ease; }
-  button:not(:disabled):hover { border-color:#adc8f5; box-shadow:0 1px 4px rgba(26,115,232,.14); }
+  /* ---------------------------------------------------------------------
+     docagent - a workbench for assembling Word documents.
+     The app chrome is quiet graphite and grey; the two documents are drawn
+     as real pages, with each block's hierarchical id set in a left margin
+     like clause numbers in a regulation. That margin is the one deliberate
+     flourish - everything else stays disciplined.
+     --------------------------------------------------------------------- */
+  :root {
+    --desk:#E4E7EB;          /* the surface the pages sit on */
+    --chrome:#22303C;        /* top bar */
+    --chrome-2:#2E3D4B;
+    --chrome-ink:#E8EDF2;
+    --paper:#FFFFFF;
+    --ink:#1D2733;
+    --muted:#5F6B78;
+    --faint:#8A95A1;
+    --rule:#D5DAE0;
+    --rule-soft:#E8EBEF;
+    --accent:#0F6E6E;        /* actions + selection: approval-stamp teal */
+    --accent-hover:#0B5858;
+    --accent-tint:#E4F1F0;
+    --accent-line:#7FB5B3;
+    --heading:#0F4761;       /* Word's heading navy */
+    --mark:#FFE680;          /* highlighter: the move target */
+    --danger:#B42318;
+    --danger-tint:#FDECEA;
+    --gutter:76px;           /* clause-number margin on each page */
+    --ui: "Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --doc: Aptos, Calibri, Carlito, "Segoe UI", sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; }
+  body { font-family:var(--ui); font-size:13px; color:var(--ink); background:var(--desk);
+    -webkit-font-smoothing:antialiased; padding-bottom:34px; }
+  button, input, select, textarea { font-family:inherit; }
+  :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* ---- top bar ------------------------------------------------------- */
+  .topbar { background:var(--chrome); color:var(--chrome-ink); display:flex; align-items:center;
+    gap:14px; padding:10px 22px; position:sticky; top:0; z-index:50; }
+  .wordmark { font-weight:700; font-size:16px; letter-spacing:-.01em; color:#fff; margin:0; }
+  .wordmark-sub { color:#9FB0C0; font-size:12px; margin:0; }
+  .topbar-spacer { flex:1; }
+  .topbar button { background:transparent; color:var(--chrome-ink); border-color:#4A5C6C; }
+  .topbar button:not(:disabled):hover { background:var(--chrome-2); border-color:#6B7F92; }
+  .topbar button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  .topbar button.primary:not(:disabled):hover { background:#13807F; border-color:#13807F; }
+  .topbar button:disabled { opacity:.38; }
+
+  /* ---- buttons ------------------------------------------------------- */
+  button { padding:6px 12px; border-radius:6px; border:1px solid var(--rule); background:var(--paper);
+    color:var(--ink); cursor:pointer; font-size:13px; font-weight:500; line-height:1.3;
+    transition:background .12s ease, border-color .12s ease, color .12s ease; }
+  button:not(:disabled):hover { border-color:#AEB7C1; background:#F6F7F9; }
   button:not(:disabled):active { transform:translateY(1px); }
   button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
-  button.primary:not(:disabled):hover { background:#1663c7; box-shadow:0 2px 8px rgba(26,115,232,.32); }
-  button.danger { background:#d93025; color:#fff; border-color:#d93025; }
-  button.danger:not(:disabled):hover { background:#bf2418; box-shadow:0 2px 8px rgba(217,48,37,.3); }
-  button.mini { padding:3px 8px; font-size:11px; }
-  button:disabled { opacity:.4; cursor:not-allowed; }
-  .sel-label { font-size:12px; color:#555; }
-  .divider { width:1px; align-self:stretch; background:#ddd; }
-  .cascade-wrap { font-size:12px; color:#555; display:flex; align-items:center; gap:4px; }
-  #status { font-size:12px; margin-left:auto; color:var(--muted); transition:color .2s ease; }
-  #status.err { color:#d93025; }
-  #status.pulse { animation:statusPulse .4s ease; }
-  @keyframes statusPulse { 0% { opacity:.3; transform:translateY(-2px);} 100% { opacity:1; transform:none;} }
-  .panes { display:flex; gap:20px; }
-  .pane { flex:1; min-width:0; }
-  .pane-head { display:flex; justify-content:space-between; align-items:baseline; }
-  body.focus-mode #pane-other { display:none; }
-  body.focus-mode #render-base { max-height:72vh; }
-  body.focus-mode #focus-btn { background:#1a73e8; color:#fff; border-color:#1a73e8; }
-  .pane-actions { font-size:11px; color:var(--accent); cursor:pointer; user-select:none; }
-  .render { border:1px solid var(--line); border-radius:6px; padding:10px; min-height:200px; max-height:58vh; overflow-y:auto; }
-  .block { margin:5px 0; padding:6px 72px 6px 32px; border-radius:4px; position:relative; cursor:pointer; border:1px solid transparent;
-    transition:background .15s ease, border-color .15s ease, box-shadow .15s ease; }
-  .block:hover { background:#f7f7f9; box-shadow:0 1px 3px rgba(0,0,0,.06); }
-  .block.selected { background:#e8f0fe; border-color:#8ab4f8; }
-  .block.move-target { outline:2px solid #f9ab00; }
-  .table-scroll { max-width:100%; overflow-x:auto; }
-  .text-editing { outline:2px solid #1a73e8; background:#fff; border-radius:3px; padding:2px 4px; }
+  button.primary:not(:disabled):hover { background:var(--accent-hover); border-color:var(--accent-hover); }
+  button.danger { color:var(--danger); border-color:#E7B8B3; background:var(--paper); }
+  button.danger:not(:disabled):hover { background:var(--danger-tint); border-color:var(--danger); }
+  button.mini { padding:3px 9px; font-size:12px; }
+  button.quiet { border-color:transparent; background:transparent; color:var(--muted); }
+  button.quiet:not(:disabled):hover { background:var(--rule-soft); color:var(--ink); border-color:transparent; }
+  button:disabled { opacity:.42; cursor:not-allowed; }
 
-  /* modal */
-  .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.4); display:flex;
-    align-items:center; justify-content:center; z-index:1000; animation:backdropIn .18s ease; }
-  .modal-backdrop.hidden { display:none; }
-  @keyframes backdropIn { from { opacity:0; } to { opacity:1; } }
-  .modal { background:#fff; border-radius:10px; padding:18px; width:min(920px,92vw);
-    max-height:88vh; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(0,0,0,.25);
-    animation:modalIn .2s cubic-bezier(.2,.7,.3,1); }
-  @keyframes modalIn { from { opacity:0; transform:translateY(10px) scale(.985); } to { opacity:1; transform:none; } }
-  .modal h3 { margin:0 0 4px; font-size:16px; }
-  .modal .modal-sub { font-size:12px; color:var(--muted); margin:0 0 12px; }
-  .modal-grid-wrap { overflow:auto; border:1px solid var(--line); border-radius:6px; flex:1; min-height:120px; }
-  table.edit-grid { border-collapse:collapse; width:100%; font-size:13px; }
-  table.edit-grid th, table.edit-grid td { border:1px solid var(--line); padding:0; }
-  table.edit-grid th { background:#f7f7f9; padding:4px; vertical-align:top; white-space:nowrap; }
-  table.edit-grid th.corner-th { width:96px; background:#fafafa; }
-  .th-bar { display:flex; gap:4px; justify-content:space-between; margin-bottom:3px; }
-  .th-sort { border:1px solid #adc8f5; background:#eef3fc; color:#1a56c4; border-radius:3px;
-    font-size:10px; padding:1px 5px; cursor:pointer; }
-  .th-sort:hover { background:#dbe8fd; }
-  .th-delcol { border:1px solid #f3c0bc; background:#fdeceb; color:#c5221f; border-radius:3px;
-    font-size:10px; padding:1px 5px; cursor:pointer; }
-  .th-delcol:hover { background:#fbdad7; }
-  .th-input { width:100%; box-sizing:border-box; border:1px solid #d0d7de; border-radius:3px;
-    padding:5px 7px; font-size:13px; font-weight:700; font-family:inherit; background:#fff; }
-  .th-input:focus { outline:2px solid #1a73e8; outline-offset:-1px; background:#fff8e1; }
-  table.edit-grid td input { width:100%; box-sizing:border-box; border:none; padding:6px 8px; font-size:13px;
-    font-family:inherit; background:transparent; }
-  table.edit-grid td input:focus { background:#fff8e1; outline:2px solid #1a73e8; outline-offset:-2px; }
-  table.edit-grid td.row-handle { width:96px; background:#fafafa; padding:2px 4px; }
-  .handle-inner { display:flex; align-items:center; gap:2px; flex-wrap:wrap; }
-  .row-move { border:1px solid #ccc; background:#fff; border-radius:3px; cursor:pointer;
-    font-size:11px; padding:1px 5px; line-height:1.2; }
-  .row-move:hover:not(:disabled) { background:#eef3fc; border-color:#adc8f5; }
-  .row-move:disabled { opacity:.3; cursor:not-allowed; }
-  .row-del-btn { border:none; background:none; color:#d93025; cursor:pointer; font-size:13px; padding:1px 4px; }
-  .modal-toolbar { display:flex; gap:8px; align-items:center; margin:10px 0; flex-wrap:wrap; }
-  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:14px; }
-  .source-tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:10px; background:#eef3fc; color:#1a73e8; margin-right:4px; }
-  .mh-option { font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; cursor:pointer; }
-  .mh-option:hover { background:#f7f7f9; }
-  .mh-preview { font-family:monospace; font-size:12px; color:#555; }
-  #outline-drawer { position:fixed; top:0; right:0; width:300px; height:100vh; background:#fff;
-    border-left:1px solid var(--line); box-shadow:-4px 0 16px rgba(0,0,0,.08); z-index:900;
-    display:flex; flex-direction:column; animation:drawerIn .22s cubic-bezier(.2,.7,.3,1); }
+  /* ---- action bar ---------------------------------------------------- */
+  .toolbar { position:sticky; top:52px; z-index:40; background:var(--paper); border-bottom:1px solid var(--rule);
+    display:flex; align-items:flex-end; gap:22px; padding:8px 22px 10px; flex-wrap:wrap; }
+  .tool-group { display:flex; flex-direction:column; gap:4px; }
+  .tool-group-label { font-size:11px; color:var(--faint); font-weight:500; }
+  .tool-row { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .cascade-wrap { font-size:12px; color:var(--muted); display:flex; align-items:center; gap:5px; margin-left:2px; }
+  .selection-readout { margin-left:auto; font-size:12px; color:var(--muted); display:flex; gap:12px;
+    align-self:center; font-variant-numeric:tabular-nums; }
+  .selection-readout b { color:var(--ink); font-weight:600; }
+  .divider { width:1px; align-self:stretch; background:var(--rule); }
+  body.focus-mode #focus-btn { background:var(--accent-tint); border-color:var(--accent-line); color:var(--accent); }
+
+  /* ---- contextual table strip ---------------------------------------- */
+  #table-panel { display:none; margin:0; padding:9px 22px; background:var(--accent-tint);
+    border-bottom:1px solid var(--accent-line); }
+  #table-panel h3 { margin:0; font-size:13px; font-weight:600; display:inline; }
+  #tp-target { font-weight:400; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .tp-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .tp-note { font-size:12px; color:var(--muted); }
+  #tp-hint { font-size:12px; color:var(--danger); margin:0; }
+  #tp-hint:empty { display:none; }
+
+  /* ---- the desk: two pages ------------------------------------------- */
+  .panes { display:flex; gap:26px; padding:22px; align-items:flex-start; }
+  .pane { flex:1; min-width:0; display:flex; flex-direction:column; }
+  body.focus-mode #pane-other { display:none; }
+  body.focus-mode #pane-base { max-width:980px; margin:0 auto; }
+  body.focus-mode #render-base { max-height:calc(100vh - 230px); }
+
+  .sheet-head { display:flex; align-items:center; gap:12px; padding:0 2px 10px; min-height:48px; }
+  .sheet-titles { display:flex; flex-direction:column; gap:1px; min-width:0; }
+  .sheet-title { margin:0; font-size:14px; font-weight:600; }
+  .sheet-role { font-size:12px; color:var(--muted); white-space:nowrap; }
+  .fname { font-size:12px; color:var(--ink); background:var(--paper); border:1px solid var(--rule);
+    border-radius:4px; padding:2px 8px; min-width:0; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .fname:empty { display:none; }
+  .sheet-actions { margin-left:auto; display:flex; gap:6px; align-items:center; flex-shrink:0; }
+  .file-input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+  .pane-actions { font-size:12px; color:var(--accent); cursor:pointer; user-select:none; background:none;
+    border:none; padding:3px 4px; }
+  .pane-actions:hover { text-decoration:underline; }
+
+  .render { background:var(--paper); border-radius:2px; min-height:340px; max-height:calc(100vh - 290px);
+    overflow-y:auto; padding:34px 30px 40px 0;
+    box-shadow:0 0 0 1px rgba(29,39,51,.07), 0 1px 2px rgba(29,39,51,.06), 0 8px 24px -10px rgba(29,39,51,.18); }
+  #pane-other .render { background:#FBFBFC; }
+  .pane.drop-ready .render { box-shadow:0 0 0 2px var(--accent), 0 8px 24px -10px rgba(29,39,51,.18); }
+
+  /* ---- blocks: content in Word's faces, ids in the clause margin ------ */
+  /* --pt: top padding, --lh: height of the block's first line. The margin
+     number, checkbox and controls all align to that first line. */
+  .block { --pt:5px; --lh:23px; position:relative; margin:0;
+    padding:var(--pt) 92px 5px calc(var(--gutter) + var(--indent, 0px));
+    cursor:pointer; border-left:3px solid transparent; font-family:var(--doc);
+    transition:background .12s ease, border-color .12s ease; }
+  .block:hover { background:#F5F7F8; }
+  .block.selected { background:var(--accent-tint); border-left-color:var(--accent); }
+  .block.move-target { background:#FFF7CC; border-left-color:#E0B400;
+    box-shadow:inset 0 0 0 1px #E8C547; }
+  .block.move-target::after { content:"Move here"; position:absolute; right:12px; bottom:4px;
+    font:600 11px var(--ui); color:#7A5F00; }
+  .indent-1 { --indent:0px; } .indent-2 { --indent:18px; } .indent-3 { --indent:36px; } .indent-4 { --indent:54px; }
+
+  .block-checkbox { position:absolute; left:10px; top:calc(var(--pt) + (var(--lh) - 13px) / 2); margin:0;
+    width:13px; height:13px; accent-color:var(--accent); cursor:pointer; }
+  .block-id { position:absolute; left:28px; top:var(--pt); width:calc(var(--gutter) - 36px); text-align:right;
+    font:500 11px var(--ui); line-height:var(--lh); color:var(--faint); font-variant-numeric:tabular-nums; }
+  .block[data-type="header"] .block-id { color:var(--heading); font-weight:700; }
+  .block.selected .block-id { color:var(--accent); }
+
+  .move-controls { position:absolute; right:10px; top:calc(var(--pt) + (var(--lh) - 22px) / 2); display:flex; gap:2px; opacity:.5;
+    transition:opacity .12s ease; }
+  .block:hover .move-controls, .block.selected .move-controls, .move-controls:focus-within { opacity:1; }
+  .move-controls button { padding:1px 7px; font-size:12px; line-height:1.5; border-radius:4px;
+    border:1px solid var(--rule); background:var(--paper); font-family:var(--ui); }
+  .move-controls button:not(:disabled):hover { border-color:var(--accent-line); background:var(--accent-tint); color:var(--accent); }
+
+  .header-text { font-weight:700; color:var(--heading); line-height:1.25; }
+  .header-text[data-level="1"] { font-size:21px; }
+  .header-text[data-level="2"] { font-size:17px; }
+  .block:has(.header-text) { --pt:10px; --lh:20px; }
+  .block:has(.header-text[data-level="1"]) { --pt:18px; --lh:27px; }
+  .block:has(.header-text[data-level="2"]) { --pt:12px; --lh:22px; }
+  .block:has(.header-text[data-level="1"]):first-child { --pt:6px; }
+  .block[data-type="table"] { --lh:27px; }
+  .block[data-type="image"] { --lh:26px; }
+  .header-text[data-level="3"] { font-size:15px; }
+  .header-text[data-level="4"], .header-text[data-level="5"], .header-text[data-level="6"] { font-size:14px; font-style:italic; }
+  .paragraph-text { font-size:15px; line-height:1.55; white-space:pre-wrap; max-width:72ch; }
+  .text-editing { outline:2px solid var(--accent); outline-offset:2px; background:#fff; border-radius:2px; cursor:text; }
+  .block.editing-text { background:#fff; }
+
+  .image-block { display:flex; flex-wrap:wrap; gap:8px; align-items:center; padding:3px 0; }
+  .image-block img { max-width:260px; max-height:170px; border:1px solid var(--rule-soft); background:#fff; }
+  .image-fallback { font:12px var(--ui); color:var(--muted); padding:8px 12px; border:1px dashed var(--rule); border-radius:3px; }
+
+  .table-scroll { max-width:100%; overflow-x:auto; padding:2px 0; }
+  table.doc-table { border-collapse:collapse; font-size:13px; font-family:var(--doc); }
+  table.doc-table td { border:1px solid #BCC4CD; padding:4px 9px; vertical-align:top; white-space:pre-wrap; }
+  table.doc-table tr:first-child td { background:#F1F3F5; font-weight:700; }
+
+  .empty-hint { color:var(--muted); font:14px/1.5 var(--ui); padding:70px 30px 70px calc(var(--gutter) - 10px); }
+  .empty-hint strong { display:block; color:var(--ink); font-size:15px; margin-bottom:4px; }
+  .empty-actions { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+
+  @keyframes flashfade { 0% { background:var(--mark); } 100% { background:transparent; } }
+  .block.flash { animation:flashfade 1.4s ease-out; }
+
+  /* ---- status bar (like Word's) -------------------------------------- */
+  .statusbar { position:fixed; left:0; right:0; bottom:0; height:30px; z-index:60; display:flex;
+    align-items:center; gap:16px; padding:0 22px; background:var(--paper); border-top:1px solid var(--rule);
+    font-size:12px; color:var(--muted); }
+  #status { transition:color .2s ease; }
+  #status.err { color:var(--danger); font-weight:600; }
+  #status.pulse { animation:statusPulse .35s ease; }
+  @keyframes statusPulse { from { opacity:.25; } to { opacity:1; } }
+  .statusbar-hint { margin-left:auto; color:var(--faint); }
+
+  /* ---- outline drawer ------------------------------------------------ */
+  #outline-drawer { position:fixed; top:0; right:0; width:320px; height:100vh; background:var(--paper);
+    border-left:1px solid var(--rule); box-shadow:-8px 0 24px -12px rgba(29,39,51,.25); z-index:900;
+    display:flex; flex-direction:column; animation:drawerIn .2s cubic-bezier(.2,.7,.3,1); }
   #outline-drawer.hidden { display:none; }
   @keyframes drawerIn { from { transform:translateX(100%); } to { transform:translateX(0); } }
-  .outline-head { display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); }
-  .outline-head strong { flex:0 0 auto; }
-  #outline-wordcount { font-size:11px; color:var(--muted); margin-left:auto; }
-  .outline-close { cursor:pointer; font-size:20px; color:var(--muted); line-height:1; transition:color .12s ease; }
-  .outline-close:hover { color:#333; }
+  .outline-head { display:flex; align-items:center; gap:10px; padding:14px 16px; border-bottom:1px solid var(--rule); }
+  .outline-head strong { font-size:14px; }
+  #outline-wordcount { font-size:12px; color:var(--muted); margin-left:auto; font-variant-numeric:tabular-nums; }
+  .outline-close { cursor:pointer; font-size:20px; color:var(--muted); line-height:1; background:none; border:none; padding:0 4px; }
+  .outline-close:hover { color:var(--ink); }
   #outline-list { overflow-y:auto; padding:8px 0; }
-  .outline-item { padding:5px 14px; font-size:13px; cursor:pointer; white-space:nowrap;
-    overflow:hidden; text-overflow:ellipsis; border-left:3px solid transparent; transition:background .12s ease, border-color .12s ease; }
-  .outline-item:hover { background:#f5f9ff; border-left-color:#8ab4f8; }
-  .outline-item.lvl2 { padding-left:28px; font-size:12px; }
-  .outline-item.lvl3 { padding-left:42px; font-size:12px; color:#555; }
-  .outline-item.lvl4 { padding-left:56px; font-size:12px; color:#777; }
-  .block.flash { animation:flashfade 1.4s ease-out; }
+  .outline-item { padding:6px 16px; font-size:13px; cursor:pointer; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; border-left:3px solid transparent; }
+  .outline-item:hover { background:var(--accent-tint); border-left-color:var(--accent); }
+  .outline-item.lvl1 { font-weight:600; color:var(--heading); }
+  .outline-item.lvl2 { padding-left:30px; }
+  .outline-item.lvl3 { padding-left:44px; color:var(--muted); font-size:12px; }
+  .outline-item.lvl4 { padding-left:58px; color:var(--muted); font-size:12px; }
+  .outline-item.muted { color:var(--faint); cursor:default; }
+  .outline-item.muted:hover { background:none; border-left-color:transparent; }
+
+  /* ---- modals -------------------------------------------------------- */
+  .modal-backdrop { position:fixed; inset:0; background:rgba(22,31,40,.48); display:flex;
+    align-items:center; justify-content:center; z-index:1000; animation:backdropIn .16s ease; padding:16px; }
+  .modal-backdrop.hidden { display:none; }
+  @keyframes backdropIn { from { opacity:0; } to { opacity:1; } }
+  .modal { background:var(--paper); border-radius:8px; padding:22px 24px 20px; width:min(940px,100%);
+    max-height:88vh; display:flex; flex-direction:column; box-shadow:0 24px 60px -20px rgba(22,31,40,.5);
+    animation:modalIn .18s cubic-bezier(.2,.7,.3,1); }
+  .modal.narrow { width:min(520px,100%); }
+  .modal.medium { width:min(660px,100%); }
+  .modal.wide { width:min(780px,100%); }
+  @keyframes modalIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+  .modal h3 { margin:0 0 4px; font-size:17px; font-weight:600; }
+  .modal .modal-sub { font-size:13px; color:var(--muted); margin:0 0 16px; line-height:1.5; max-width:70ch; }
+  .modal-note { font-size:12px; color:var(--muted); margin:12px 0 0; line-height:1.5; }
+  .field { display:flex; flex-direction:column; gap:5px; font-size:12px; font-weight:500; color:var(--muted); }
+  .field input[type=text] { width:100%; padding:8px 10px; border:1px solid var(--rule); border-radius:6px; font-size:14px; color:var(--ink); }
+  .field-stack { display:flex; flex-direction:column; gap:12px; margin:4px 0 16px; }
+  .field-row { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+  .check { display:flex; align-items:center; gap:6px; font-size:13px; color:var(--ink); }
+  .check input { accent-color:var(--accent); }
+  select, input[type=text], input[type=number] { padding:6px 8px; border:1px solid var(--rule); border-radius:6px;
+    font-size:13px; color:var(--ink); background:var(--paper); }
+  input[type=text]:focus, select:focus, textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; border-color:var(--accent); }
+  input[type=number] { width:62px; }
+  #html-input { width:100%; min-height:240px; font:12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    border:1px solid var(--rule); border-radius:6px; padding:12px; resize:vertical; color:var(--ink); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:18px; flex-wrap:wrap; align-items:center; }
+  .modal-status { font-size:12px; color:var(--muted); margin-right:auto; }
+  .modal-toolbar { display:flex; gap:8px; align-items:center; margin:0 0 10px; flex-wrap:wrap; }
+  .modal-toolbar .tp-note { margin-left:6px; }
+  .modal-grid-wrap { overflow:auto; border:1px solid var(--rule); border-radius:6px; flex:1; min-height:140px; }
+
+  table.edit-grid { border-collapse:collapse; width:100%; font-size:13px; }
+  table.edit-grid th, table.edit-grid td { border:1px solid var(--rule-soft); padding:0; }
+  table.edit-grid th { background:#F1F3F5; padding:6px; vertical-align:top; white-space:nowrap; position:sticky; top:0; z-index:1; }
+  table.edit-grid th.corner-th { width:100px; background:#F1F3F5; }
+  .th-bar { display:flex; gap:4px; justify-content:space-between; margin-bottom:4px; }
+  .th-sort, .th-delcol { border:1px solid var(--rule); background:var(--paper); border-radius:4px;
+    font-size:11px; padding:1px 6px; cursor:pointer; font-weight:500; }
+  .th-sort { color:var(--accent); }
+  .th-sort:hover { background:var(--accent-tint); border-color:var(--accent-line); }
+  .th-delcol { color:var(--danger); }
+  .th-delcol:hover { background:var(--danger-tint); border-color:#E7B8B3; }
+  .th-input { width:100%; border:1px solid var(--rule); border-radius:4px; padding:6px 8px;
+    font-size:13px; font-weight:700; background:var(--paper); color:var(--ink); }
+  .th-input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  table.edit-grid td input { width:100%; border:none; padding:7px 9px; font-size:13px; background:transparent; color:var(--ink); }
+  table.edit-grid td input:focus { background:#FFFBE5; outline:2px solid var(--accent); outline-offset:-2px; }
+  table.edit-grid tr:hover td { background:#FAFBFC; }
+  table.edit-grid td.row-handle { width:100px; background:#F7F8FA; padding:3px 5px; }
+  .handle-inner { display:flex; align-items:center; gap:2px; flex-wrap:wrap; }
+  .row-move { border:1px solid var(--rule); background:var(--paper); border-radius:4px; cursor:pointer;
+    font-size:11px; padding:1px 6px; line-height:1.3; }
+  .row-move:hover:not(:disabled) { background:var(--accent-tint); border-color:var(--accent-line); }
+  .row-move:disabled { opacity:.3; cursor:not-allowed; }
+  .row-del-btn { border:none; background:none; color:var(--danger); cursor:pointer; font-size:13px; padding:1px 5px; border-radius:4px; }
+  .row-del-btn:hover { background:var(--danger-tint); }
+  .source-tag { display:inline-block; font-size:10px; padding:1px 6px; border-radius:3px; background:var(--accent-tint);
+    color:var(--accent); margin-right:4px; font-weight:600; font-variant-numeric:tabular-nums; }
+  .mh-option { font-size:13px; padding:10px 12px; border:1px solid var(--rule); border-radius:6px; cursor:pointer;
+    display:flex; gap:8px; align-items:baseline; }
+  .mh-option:hover { background:#F6F7F9; }
+  .mh-option:has(input:checked) { border-color:var(--accent); background:var(--accent-tint); }
+  .mh-option input { accent-color:var(--accent); }
+  .mh-preview { color:var(--muted); }
+  #mh-options { display:flex; flex-direction:column; gap:8px; margin:0 0 14px; }
+
+  /* ---- small screens ------------------------------------------------- */
+  @media (max-width: 960px) {
+    .panes { flex-direction:column; padding:14px 12px; }
+    .pane { width:100%; }
+    .toolbar { position:static; gap:12px; padding:8px 12px; }
+    .topbar { position:static; padding:10px 12px; flex-wrap:wrap; }
+    .statusbar-hint { display:none; }
+    .sheet-head { flex-wrap:wrap; }
+    .sheet-actions { margin-left:0; }
+    .indent-2 { --indent:10px; } .indent-3 { --indent:20px; } .indent-4 { --indent:30px; }
+    .wordmark-sub { display:none; }
+    .render { max-height:none; padding:22px 14px 26px 0; }
+    :root { --gutter:62px; }
+    .block { padding-right:14px; }
+    .block-id { top:calc(var(--pt) + 26px); }
+    .block-checkbox { top:calc(var(--pt) + 26px + (var(--lh) - 13px) / 2); }
+    .block > :not(.block-checkbox):not(.block-id):not(.move-controls) { margin-top:26px; }
+    .move-controls { top:4px; opacity:1; }
+    .selection-readout { margin-left:0; }
+  }
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation-duration:.001ms !important; animation-iteration-count:1 !important;
       transition-duration:.001ms !important; }
   }
-  @keyframes flashfade { 0%{background:#fff3c4;} 100%{background:transparent;} }
-  .block-checkbox { position:absolute; left:8px; top:8px; }
-  .block-id { font-size:10px; color:#aaa; font-family:monospace; position:absolute; right:8px; top:6px; }
-  .move-controls { position:absolute; right:6px; top:5px; display:flex; gap:3px; }
-  .move-controls button { padding:2px 7px; font-size:12px; line-height:1.2; border:1px solid #ccc;
-    background:#fff; border-radius:4px; cursor:pointer; }
-  .move-controls button:hover { background:#eef3fc; border-color:#adc8f5; }
-  .header-text { font-weight:700; }
-  .header-text[data-level="1"] { font-size:19px; }
-  .header-text[data-level="2"] { font-size:16px; }
-  .header-text[data-level="3"] { font-size:14px; }
-  .paragraph-text { font-size:13px; line-height:1.5; }
-  .image-block { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
-  .image-block img { max-width:240px; max-height:160px; border:1px solid #e3e3e3; border-radius:4px; background:#fff; }
-  .image-fallback { font-size:12px; color:#888; padding:6px 10px; border:1px dashed #ccc; border-radius:4px; }
-  table.doc-table { border-collapse:collapse; margin:4px 0; font-size:12px; }
-  table.doc-table td { border:1px solid #ddd; padding:4px 8px; }
-  table.doc-table tr:first-child td { background:#fafafa; font-weight:600; }
-  .indent-1{margin-left:0}.indent-2{margin-left:16px}.indent-3{margin-left:32px}.indent-4{margin-left:48px}
-  .empty-hint { color:#aaa; font-size:13px; padding:20px; text-align:center; }
-  #table-panel { margin:14px 0; padding:12px; border:1px solid #cfe0fb; background:#f5f9ff; border-radius:8px; display:none; }
-  #table-panel h3 { margin:0 0 8px; font-size:13px; }
-  .tp-row { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px; }
-  .tp-row label { font-size:12px; color:#555; }
-  select, input[type=text], input[type=number] { padding:5px 7px; border:1px solid #ccc; border-radius:5px; font-size:12px; }
-  input[type=number] { width:62px; }
 </style>
 </head>
 <body>
 
-<h1>Doc Editor Prototype</h1>
-<p class="sub">Block ids renumber automatically after every edit, so they always match the document's real structure.</p>
+<header class="topbar">
+  <p class="wordmark">docagent</p>
+  <p class="wordmark-sub">Build a document from blocks, then export it to Word</p>
+  <div class="topbar-spacer"></div>
+  <button id="undo-btn" disabled onclick="doUndo()" title="Undo the last change to the base document (up to 20 steps)">Undo</button>
+  <button id="export-tracked-btn" disabled onclick="doExport(true)" title="Download a .docx where every edit since upload is a Word tracked change you can accept or reject">Export with tracked changes</button>
+  <button id="export-btn" class="primary" disabled onclick="doExport()" title="Download the edited base document">Export .docx</button>
+</header>
 
-<div class="upload-row">
-  <div class="upload-box" id="upload-box-base">
-    <strong>Base document</strong>
-    <p style="font-size:12px;color:#888;margin:6px 0;">The document you edit and export.</p>
-    <input type="file" id="file-base" accept=".docx" /><button onclick="uploadDoc('base')">Upload</button>
-    <button class="mini" onclick="openHtmlPaste()" style="margin-left:4px;">Paste HTML&hellip;</button>
-    <div class="fname" id="fname-base"></div>
+<div class="toolbar" role="toolbar" aria-label="Document actions">
+  <div class="tool-group">
+    <span class="tool-group-label">Between documents</span>
+    <div class="tool-row">
+      <button id="replace-btn" class="primary" disabled onclick="doReplace()" title="Check one block in each document: the base block's content is replaced by the source block">Replace</button>
+      <button id="insert-btn" class="primary" disabled onclick="doInsert()" title="Check one block in the base (the anchor) and one or more in the source">Insert after</button>
+    </div>
   </div>
-  <div class="upload-box" id="upload-box-other">
-    <strong>Other document</strong>
-    <p style="font-size:12px;color:#888;margin:6px 0;">Pull content from here.</p>
-    <input type="file" id="file-other" accept=".docx" /><button onclick="uploadDoc('other')">Upload</button>
-    <button class="mini" onclick="openHtmlPaste()" style="margin-left:4px;">Paste HTML&hellip;</button>
-    <div class="fname" id="fname-other"></div>
+  <div class="tool-group">
+    <span class="tool-group-label">In the base document</span>
+    <div class="tool-row">
+      <button id="moveto-btn" disabled onclick="doMoveTo()" title="Check blocks to move, then Ctrl/Cmd-click the block they should follow">Move to target</button>
+      <button id="duplicate-btn" disabled onclick="doDuplicate()" title="Copy the checked blocks (a heading copies its whole section)">Duplicate</button>
+      <button id="merge-btn" disabled onclick="openMergeEditor()" title="Check two or more tables in the base">Merge tables&hellip;</button>
+      <button id="delete-btn" class="danger" disabled onclick="doDelete()" title="Delete the checked blocks">Delete</button>
+      <label class="cascade-wrap" title="Acting on a heading also covers everything nested under it">
+        <input type="checkbox" id="cascade-toggle" checked /> Include sub-content
+      </label>
+    </div>
   </div>
-</div>
-
-<div class="toolbar">
-  <span class="sel-label">Base: <b id="sel-base-label">0</b></span>
-  <span class="sel-label">Other: <b id="sel-other-label">0</b></span>
-  <div class="divider"></div>
-  <button id="replace-btn" class="primary" disabled onclick="doReplace()" title="1 checked in each pane">Replace (1&rarr;1)</button>
-  <button id="insert-btn" class="primary" disabled onclick="doInsert()" title="1 anchor in base + 1 or more in other">Insert after anchor &rarr;</button>
-  <button id="moveto-btn" disabled onclick="doMoveTo()" title="Check blocks to move, then Ctrl/Cmd-click a target block in base">Move to target</button>
-  <button id="duplicate-btn" disabled onclick="doDuplicate()" title="Clone the checked blocks (a heading clones its whole section)">Duplicate</button>
-  <button id="merge-btn" disabled onclick="openMergeEditor()" title="Check 2 or more tables in base">Merge selected tables&hellip;</button>
-  <button id="delete-btn" class="danger" disabled onclick="doDelete()" title="1 or more checked in base">Delete</button>
-  <label class="cascade-wrap" title="Operating on a heading also covers everything nested under it">
-    <input type="checkbox" id="cascade-toggle" checked /> incl. sub-content
-  </label>
-  <div class="divider"></div>
-  <button id="findrep-btn" disabled onclick="openFindReplace()" title="Find &amp; replace across the base document">Find &amp; replace&hellip;</button>
-  <button id="undo-btn" disabled onclick="doUndo()">Undo</button>
-  <button id="export-btn" disabled onclick="doExport()">Export .docx</button>
-  <button id="export-tracked-btn" disabled onclick="doExport(true)" title="Download a .docx where every edit since upload is a Word tracked change (accept/reject in Word)">Export with tracked changes</button>
-  <button id="outline-btn" onclick="toggleOutline()" title="Show a jumpable document outline">Outline</button>
-  <button id="focus-btn" onclick="toggleFocusMode()" title="Hide the Other document and edit the base full-width">Focus base &#9974;</button>
-  <span id="status"></span>
+  <div class="tool-group">
+    <span class="tool-group-label">Review</span>
+    <div class="tool-row">
+      <button id="findrep-btn" disabled onclick="openFindReplace()" title="Find and replace text across the base document">Find &amp; replace&hellip;</button>
+      <button id="outline-btn" onclick="toggleOutline()" title="Show the heading outline and word count">Outline</button>
+      <button id="focus-btn" onclick="toggleFocusMode()" title="Hide the source document and edit the base at full width">Focus base</button>
+    </div>
+  </div>
+  <div class="selection-readout" aria-live="polite">
+    <span><b id="sel-base-label">0</b> checked in base</span>
+    <span><b id="sel-other-label">0</b> checked in source</span>
+  </div>
 </div>
 
 <div id="table-panel">
-  <h3>Table &mdash; <span id="tp-target"></span></h3>
-  <p id="tp-hint" style="font-size:11px;color:#c5221f;margin:0 0 8px;"></p>
   <div class="tp-row">
+    <h3>Table <span id="tp-target"></span></h3>
     <button class="mini primary" onclick="openSingleTableEditor()">Edit table&hellip;</button>
-    <span style="font-size:11px;color:#888;">Opens the editor: edit values, sort columns, reorder / add / delete rows and columns.</span>
-    <div class="divider"></div>
-    <button class="mini" onclick="tableOp('transpose',{})">Transpose</button>
+    <button class="mini" onclick="tableOp('transpose',{})" title="Swap rows and columns (merged cells are transposed too)">Transpose</button>
+    <span class="tp-note">Edit values, sort, and add, move or delete rows and columns in the table editor.</span>
+    <p id="tp-hint"></p>
   </div>
-  <p style="font-size:11px;color:#888;margin:4px 0 0;">
-    All cell editing, row reordering, and adding/deleting rows &amp; columns happen inside
-    <b>Edit table&hellip;</b>. To merge tables, check 2 or more tables and use
-    <b>Merge selected tables&hellip;</b> in the toolbar above.
-  </p>
-</div>
 </div>
 
-<div id="outline-drawer" class="hidden">
+<div id="outline-drawer" class="hidden" role="complementary" aria-label="Outline">
   <div class="outline-head">
     <strong>Outline</strong>
     <span id="outline-wordcount"></span>
-    <span class="outline-close" onclick="toggleOutline()">&times;</span>
+    <button class="outline-close" onclick="toggleOutline()" aria-label="Close outline">&times;</button>
   </div>
   <div id="outline-list"></div>
 </div>
 
-<div class="panes" id="panes">
-  <div class="pane" id="pane-base">
-    <div class="pane-head"><h2>Base document</h2>
-      <span class="pane-actions" onclick="clearChecks('base')">clear selection</span></div>
-    <div class="render" id="render-base"><div class="empty-hint">Upload a base document to begin</div></div>
-  </div>
-  <div class="pane" id="pane-other">
-    <div class="pane-head"><h2>Other document</h2>
-      <span class="pane-actions" onclick="clearChecks('other')">clear selection</span></div>
-    <div class="render" id="render-other"><div class="empty-hint">Upload another document to pull content from</div></div>
-  </div>
-</div>
+<main class="panes" id="panes">
+  <section class="pane" id="pane-base" aria-label="Base document">
+    <div class="sheet-head upload-box" id="upload-box-base">
+      <div class="sheet-titles">
+        <h2 class="sheet-title">Base document</h2>
+        <span class="sheet-role">The one you edit and export</span>
+      </div>
+      <span class="fname" id="fname-base"></span>
+      <div class="sheet-actions">
+        <input type="file" id="file-base" class="file-input" accept=".docx" onchange="uploadDoc('base')" />
+        <button class="mini" onclick="$('file-base').click()">Open .docx</button>
+        <button class="mini" onclick="openHtmlPaste()">Paste HTML&hellip;</button>
+        <button class="pane-actions" onclick="clearChecks('base')">Clear selection</button>
+      </div>
+    </div>
+    <div class="render" id="render-base">
+      <div class="empty-hint"><strong>No base document yet</strong>
+        Open a .docx or drop one here. Its headings, paragraphs, tables and images appear as numbered blocks you can rearrange.
+        <div class="empty-actions">
+          <button class="primary" onclick="$('file-base').click()">Open .docx</button>
+          <button onclick="openHtmlPaste()">Paste HTML&hellip;</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="pane" id="pane-other" aria-label="Source document">
+    <div class="sheet-head upload-box" id="upload-box-other">
+      <div class="sheet-titles">
+        <h2 class="sheet-title">Source document</h2>
+        <span class="sheet-role">Pull content from here</span>
+      </div>
+      <span class="fname" id="fname-other"></span>
+      <div class="sheet-actions">
+        <input type="file" id="file-other" class="file-input" accept=".docx" onchange="uploadDoc('other')" />
+        <button class="mini" onclick="$('file-other').click()">Open .docx</button>
+        <button class="mini" onclick="openHtmlPaste()">Paste HTML&hellip;</button>
+        <button class="pane-actions" onclick="clearChecks('other')">Clear selection</button>
+      </div>
+    </div>
+    <div class="render" id="render-other">
+      <div class="empty-hint"><strong>No source document</strong>
+        Open a second .docx to copy blocks from it into the base, or skip this and edit the base on its own.
+        <div class="empty-actions">
+          <button onclick="$('file-other').click()">Open .docx</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="statusbar">
+  <span id="status" role="status" aria-live="polite"></span>
+  <span class="statusbar-hint">Ctrl/Cmd-click a base block to make it the move target</span>
+</footer>
 
 <div class="modal-backdrop hidden" id="findrep-modal">
-  <div class="modal" style="width:min(520px,92vw);">
-    <h3>Find &amp; replace (base document)</h3>
-    <p class="modal-sub">Replaces text everywhere in the base document, including inside table cells.</p>
-    <div style="display:flex;flex-direction:column;gap:8px;margin:6px 0 12px;">
-      <label style="font-size:12px;color:#555;">Find
-        <input type="text" id="fr-find" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font-size:13px;" /></label>
-      <label style="font-size:12px;color:#555;">Replace with
-        <input type="text" id="fr-replace" style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid var(--line);border-radius:5px;font-size:13px;" /></label>
-      <div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;">
-        <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:5px;">
-          <input type="checkbox" id="fr-case" /> Case sensitive</label>
-        <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:5px;">Scope
-          <select id="fr-scope" style="padding:4px 6px;border:1px solid var(--line);border-radius:5px;font-size:12px;">
+  <div class="modal narrow" role="dialog" aria-labelledby="fr-title">
+    <h3 id="fr-title">Find &amp; replace</h3>
+    <p class="modal-sub">Replaces every match in the base document, including inside tables. Formatting around each match is kept.</p>
+    <div class="field-stack">
+      <label class="field">Find
+        <input type="text" id="fr-find" /></label>
+      <label class="field">Replace with
+        <input type="text" id="fr-replace" /></label>
+      <div class="field-row">
+        <label class="check"><input type="checkbox" id="fr-case" /> Match case</label>
+        <label class="check">Search in
+          <select id="fr-scope">
             <option value="all">Everywhere</option>
-            <option value="text">Text only (paragraphs/headers)</option>
+            <option value="text">Text only (paragraphs and headings)</option>
             <option value="tables">Tables only</option>
           </select></label>
       </div>
     </div>
     <div class="modal-actions">
-      <span id="fr-status" style="font-size:12px;color:#888;margin-right:auto;"></span>
+      <span id="fr-status" class="modal-status"></span>
       <button onclick="closeFindReplace()">Cancel</button>
       <button class="primary" onclick="doFindReplace()">Replace all</button>
     </div>
@@ -254,14 +454,13 @@
 </div>
 
 <div class="modal-backdrop hidden" id="merge-header-modal">
-  <div class="modal" style="width:min(620px,92vw);">
-    <h3>Which header should the merged table use?</h3>
-    <p class="modal-sub">The tables you're merging have <b>different header rows</b>. Pick which one
-      to keep as the header of the merged table - the others become data rows or are dropped.</p>
-    <div id="mh-options" style="display:flex;flex-direction:column;gap:8px;margin:6px 0 12px;"></div>
-    <label style="font-size:12px;color:#555;display:flex;align-items:center;gap:6px;">
+  <div class="modal medium" role="dialog" aria-labelledby="mh-title">
+    <h3 id="mh-title">Which header should the merged table use?</h3>
+    <p class="modal-sub">These tables have different header rows. Pick the one to keep; the others become data rows or are dropped.</p>
+    <div id="mh-options"></div>
+    <label class="check">
       <input type="checkbox" id="mh-drop-others" checked />
-      Drop the other tables' header rows (uncheck to keep them as data rows)
+      Drop the other tables' header rows (clear this to keep them as data rows)
     </label>
     <div class="modal-actions">
       <button onclick="cancelMergeHeader()">Cancel</button>
@@ -271,44 +470,34 @@
 </div>
 
 <div class="modal-backdrop hidden" id="html-modal">
-  <div class="modal" style="width:min(760px,92vw);">
-    <h3>Paste HTML (from Froala or elsewhere)</h3>
-    <p class="modal-sub">Paste HTML below. It will be converted into editable blocks
-      (headings, paragraphs, captions, lists, tables). Then choose where it should go.</p>
-    <textarea id="html-input" placeholder="&lt;h2&gt;Section&lt;/h2&gt;&#10;&lt;p&gt;Some text&lt;/p&gt;&#10;&lt;table&gt;...&lt;/table&gt;"
-      style="width:100%;box-sizing:border-box;min-height:220px;font-family:monospace;font-size:12px;
-      border:1px solid var(--line);border-radius:6px;padding:10px;resize:vertical;"></textarea>
-    <div class="modal-actions" style="flex-wrap:wrap;">
-      <span id="html-status" style="font-size:12px;color:#888;margin-right:auto;"></span>
+  <div class="modal wide" role="dialog" aria-labelledby="html-title">
+    <h3 id="html-title">Paste HTML</h3>
+    <p class="modal-sub">Paste HTML from Froala or any editor. Headings, paragraphs, captions, lists and tables become editable blocks; bold, italic and underline carry over, inline fonts and colours don't.</p>
+    <textarea id="html-input" placeholder="&lt;h2&gt;Section&lt;/h2&gt;&#10;&lt;p&gt;Some text&lt;/p&gt;&#10;&lt;table&gt;...&lt;/table&gt;"></textarea>
+    <div class="modal-actions">
+      <span id="html-status" class="modal-status"></span>
       <button onclick="closeHtmlPaste()">Cancel</button>
-      <button onclick="submitHtml('append-base')" title="Append these blocks to the end of the base document">Append to base</button>
-      <button onclick="submitHtml('other-doc')">Load as Other document</button>
-      <button class="primary" onclick="submitHtml('base-doc')" title="Load as a fresh Base document (replaces current base)">Load as Base document</button>
+      <button onclick="submitHtml('append-base')" title="Add these blocks to the end of the current base document">Append to base</button>
+      <button onclick="submitHtml('other-doc')" title="Open it in the source pane so you can copy pieces from it">Open as source</button>
+      <button class="primary" onclick="submitHtml('base-doc')" title="Start a new base document from this HTML (replaces the current base)">Open as base</button>
     </div>
-    <p style="font-size:11px;color:#888;margin:8px 0 0;">
-      <b>Append to base</b> adds the content to your current base doc. <b>Load as Other</b> puts it
-      in the right-hand pane so you can pull pieces from it. <b>Load as Base</b> starts a new base doc
-      from the HTML. (Froala inline styles like fonts/colours aren't carried over - structure, bold,
-      italic, underline and tables are.)
-    </p>
   </div>
 </div>
 
 <div class="modal-backdrop hidden" id="editor-modal">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-labelledby="em-title">
     <h3 id="em-title">Edit table</h3>
     <p class="modal-sub" id="em-sub"></p>
     <div class="modal-toolbar">
-      <button class="mini" onclick="editorAddRow()">+ Row</button>
-      <button class="mini" onclick="editorAddColumn()">+ Column</button>
-      <span style="font-size:11px;color:#888;">The top (shaded) row is the header. Use <b>sort</b> on a
-        column to reorder data rows, the <b>&uarr;&darr;</b> on a row to move it, and <b>&#10005;</b> to delete.</span>
+      <button class="mini" onclick="editorAddRow()">Add row</button>
+      <button class="mini" onclick="editorAddColumn()">Add column</button>
+      <span class="tp-note">The shaded top row is the header. Sort by a column, move rows with &uarr; &darr;, delete with &#10005;. Nothing changes until you save.</span>
     </div>
     <div class="modal-grid-wrap"><table class="edit-grid" id="em-grid"></table></div>
     <div class="modal-actions">
-      <span id="em-status" style="font-size:12px;color:#888;margin-right:auto;"></span>
+      <span id="em-status" class="modal-status"></span>
       <button onclick="closeEditor()">Cancel</button>
-      <button class="primary" onclick="saveEditor()">Save</button>
+      <button class="primary" onclick="saveEditor()">Save table</button>
     </div>
   </div>
 </div>
@@ -387,14 +576,14 @@ async function uploadDoc(pane) {
   const file = $(`file-${pane}`).files[0];
   if (!file) { setStatus('Choose a .docx file first', true); return; }
   const fd = new FormData(); fd.append('file', file);
-  setStatus('Uploading...');
+  setStatus(`Opening ${file.name}...`);
   document.body.style.cursor = 'progress';
   try {
     const res  = await fetch('/upload', { method:'POST', body:fd });
     const data = await res.json();
     if (!res.ok) { setStatus(data.error || 'Upload failed', true); return; }
     loadDocIntoPane(pane, data);
-    setStatus(`Loaded ${Object.keys(data.blocks).length} blocks`);
+    setStatus(`Opened ${data.filename || file.name}: ${Object.keys(data.blocks).length} blocks`);
   } catch (err) { console.error(err); setStatus('Upload failed - check console', true); }
   finally { document.body.style.cursor=''; }
 }
@@ -445,7 +634,7 @@ async function submitHtml(dest) {
     } else {
       const pane = (dest === 'other-doc') ? 'other' : 'base';   // base-doc -> base pane
       loadDocIntoPane(pane, data);
-      setStatus(`HTML loaded as ${pane==='base'?'base':'other'} document`);
+      setStatus(`HTML opened as the ${pane==='base'?'base':'source'} document`);
     }
     closeHtmlPaste();
   } catch (err) {
@@ -486,7 +675,7 @@ function renderPane(pane) {
   nodeIndex[pane].clear();
 
   if (!Object.keys(blocks).length) {
-    container.innerHTML = '<div class="empty-hint">Document is empty</div>';
+    container.innerHTML = '<div class="empty-hint"><strong>This document is empty</strong>Insert blocks from the source document or paste HTML to add content.</div>';
     painted[pane] = sig; return;
   }
 
@@ -524,7 +713,7 @@ function buildBlockNode(pane, block) {
     if (pane === 'base' && (e.ctrlKey || e.metaKey)) {
       moveTarget = moveTarget === block.id ? null : block.id;
       refreshSelection('base'); updateToolbar();
-      setStatus(moveTarget ? `Target: ${moveTarget}` : 'Target cleared');
+      setStatus(moveTarget ? `Move target: block ${moveTarget}` : 'Move target cleared');
       return;
     }
     toggleBlock(pane, block.id);
@@ -726,7 +915,7 @@ const doMoveTo = () => apiPost('/move_to', {
 function doDelete() {
   const ids = [...state.base.checked];
   const cascade = $('cascade-toggle').checked;
-  if (!confirm(`Delete ${ids.length} block(s)${cascade ? ' (plus nested sub-content)' : ''}?`)) return;
+  if (!confirm(`Delete ${ids.length} block${ids.length===1?'':'s'}${cascade ? ' and everything nested under them' : ''}? You can undo this.`)) return;
   apiPost('/delete', { doc_id:state.base.doc_id, block_ids:ids, cascade }, { label:'Deleted' });
 }
 
@@ -793,13 +982,13 @@ function renderOutline() {
   const list = $('outline-list');
   const blocks = state.base.blocks;
   list.innerHTML = '';
-  if (!blocks) { list.innerHTML = '<div class="outline-item" style="color:#aaa;">No base document</div>'; $('outline-wordcount').textContent=''; return; }
+  if (!blocks) { list.innerHTML = '<div class="outline-item muted">Open a base document to see its outline</div>'; $('outline-wordcount').textContent=''; return; }
 
   $('outline-wordcount').textContent = `${countWords(blocks)} words`;
 
   const headers = Object.values(blocks).filter(b => b.type === 'header').sort((a,b)=>a.order-b.order);
   if (!headers.length) {
-    list.innerHTML = '<div class="outline-item" style="color:#aaa;">No headings in this document</div>';
+    list.innerHTML = '<div class="outline-item muted">This document has no headings</div>';
     return;
   }
   headers.forEach(h => {
@@ -840,9 +1029,9 @@ const doExport = (tracked = false) => {
 // state, and the toolbar buttons that require it simply stay disabled.
 function toggleFocusMode() {
   const on = document.body.classList.toggle('focus-mode');
-  $('focus-btn').innerHTML = on ? 'Show other doc \u21A9' : 'Focus base \u26C6';
+  $('focus-btn').textContent = on ? 'Show source' : 'Focus base';
   if (on) { state.other.checked = new Set(); renderPane('other'); updateToolbar(); }
-  setStatus(on ? 'Focus mode: editing base full-width' : 'Both documents shown');
+  setStatus(on ? 'Source hidden - editing the base at full width' : 'Both documents shown');
 }
 
 // ===========================================================================
@@ -1151,6 +1340,41 @@ async function saveEditor() {
   }
   closeEditor();
 }
+
+// ---- drop a .docx onto either page to open it ----
+['base','other'].forEach(pane => {
+  const el = document.getElementById(`pane-${pane}`);
+  if (!el) return;
+  el.addEventListener('dragover', e => {
+    if (![...(e.dataTransfer?.types || [])].includes('Files')) return;
+    e.preventDefault(); el.classList.add('drop-ready');
+  });
+  el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('drop-ready'); });
+  el.addEventListener('drop', e => {
+    el.classList.remove('drop-ready');
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    e.preventDefault();
+    if (!/\.docx$/i.test(file.name)) { setStatus('Only .docx files can be opened', true); return; }
+    try {
+      const dt = new DataTransfer(); dt.items.add(file);
+      $(`file-${pane}`).files = dt.files;
+      uploadDoc(pane);
+    } catch (err) { console.error(err); setStatus('Could not open the dropped file', true); }
+  });
+});
+
+// ---- Esc closes the open dialog, or the outline ----
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || document.querySelector('.text-editing')) return;
+  const open = [...document.querySelectorAll('.modal-backdrop:not(.hidden)')].pop();
+  if (open) {
+    ({ 'findrep-modal':closeFindReplace, 'html-modal':closeHtmlPaste,
+       'editor-modal':closeEditor, 'merge-header-modal':cancelMergeHeader }[open.id] || (()=>{}))();
+  } else if (!$('outline-drawer').classList.contains('hidden')) {
+    toggleOutline();
+  }
+});
 </script>
 
 </body>
